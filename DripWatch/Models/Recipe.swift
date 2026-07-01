@@ -41,6 +41,14 @@ struct Recipe: Codable, Hashable {
     var yieldGrams: Double?
     var shotTimeSec: Int?
 
+    // Manual-machine technique for non-PID/non-pressure setups (e.g. Gaggia Classic Pro).
+    // Temperature is controlled by "surfing" rather than measured: wait N seconds after the
+    // brew light, then flip the steam switch (steaming mode) for M seconds to raise the boiler.
+    // Pre-infusion is "poor man's" — bleeding group pressure via the steam wand for K seconds.
+    var preInfusionSec: Int?   // poor-man's pre-infusion (steam-wand bleed)
+    var surfWaitSec: Int?      // seconds waited after the brew light comes on (post-purge)
+    var steamModeSec: Int?     // seconds the steam switch is flipped on (temperature surf)
+
     init() {}
 
     /// Brew ratio for espresso (yield ÷ dose), e.g. 2.0 for a 1:2 shot.
@@ -69,6 +77,7 @@ struct Recipe: Codable, Hashable {
         grind == nil && waterTempC == nil && doseGrams == nil && ratio == nil
             && totalWaterGrams == nil && pourCount == nil && bloomTimeSec == nil
             && totalDrawdownSec == nil && yieldGrams == nil && shotTimeSec == nil
+            && preInfusionSec == nil && surfWaitSec == nil && steamModeSec == nil
             && (notes?.isEmpty ?? true) && meaningfulPours.isEmpty
     }
 

@@ -81,7 +81,9 @@ enum SampleData {
         let esp = Brew(brewedAt: day(6, 24), method: .espresso, recipe: {
             var r = Recipe()
             r.grind = GrindSetting(grinderName: "Niche Zero", major: 12, clickOffset: 0)
-            r.doseGrams = 18; r.yieldGrams = 40; r.shotTimeSec = 30; r.waterTempC = 93
+            r.doseGrams = 18; r.yieldGrams = 36; r.shotTimeSec = 28
+            // Gaggia Classic Pro manual technique (no PID / no pressure gauge).
+            r.preInfusionSec = 6; r.surfWaitSec = 8; r.steamModeSec = 4
             return r
         }())
         esp.taste = { var t = Taste(); t.positives = ["syrupy", "red plum"]; t.negatives = ["slightly sharp"]; t.rating = 4; return t }()
@@ -90,8 +92,8 @@ enum SampleData {
         crimson.pendingNextEspresso = {
             var r = esp.recipe
             r.grind = GrindSetting(grinderName: "Niche Zero", major: 11, clickOffset: 0)   // finer
-            r.shotTimeSec = 33
-            r.notes = "grind finer, aim ~33s to tame the sharpness"
+            r.surfWaitSec = 11; r.preInfusionSec = 8
+            r.notes = "finer, longer surf & pre-infusion to tame the sharpness"
             return r
         }()
         esp.nextRecipeDraft = crimson.pendingNextEspresso

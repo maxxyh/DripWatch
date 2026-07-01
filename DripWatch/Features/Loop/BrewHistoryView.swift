@@ -113,6 +113,9 @@ struct RecipeReadout: View {
             if let w = recipe.effectiveWaterGrams, recipe.doseGrams != nil { pill("drop.fill", "\(gramText(w))g") }
             if let p = recipe.pourCount { pill("drop", "\(p) pour\(p == 1 ? "" : "s")") }
             if let st = recipe.shotTimeSec { pill("timer", "\(st)s shot") }
+            if let pi = recipe.preInfusionSec { pill("drop.circle", "PI \(pi)s") }
+            if let sw = recipe.surfWaitSec { pill("clock", "surf \(sw)s") }
+            if let sm = recipe.steamModeSec { pill("flame", "steam \(sm)s") }
             if let b = recipe.bloomTimeSec { pill("timer", "bloom \(timeText(b))") }
             if let tdd = recipe.totalDrawdownSec { pill("hourglass", "TDD \(timeText(tdd))") }
         }

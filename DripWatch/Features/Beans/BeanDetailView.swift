@@ -49,7 +49,7 @@ struct BeanDetailView: View {
             }
             if UserDefaults.standard.bool(forKey: "openBrewSheet") {
                 try? await Task.sleep(for: .milliseconds(300))
-                captureMethod = .pourover
+                captureMethod = UserDefaults.standard.bool(forKey: "openEspressoBean") ? .espresso : .pourover
             }
         }
         #endif

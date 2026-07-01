@@ -35,6 +35,18 @@ enum BrewDiff {
             out.append("shot \(a)s → \(b)s")
         }
 
+        if let a = prev.preInfusionSec, let b = curr.preInfusionSec, a != b {
+            out.append("pre-infuse \(a)s → \(b)s")
+        }
+
+        if let a = prev.surfWaitSec, let b = curr.surfWaitSec, a != b {
+            out.append("surf \(a)s → \(b)s")
+        }
+
+        if let a = prev.steamModeSec, let b = curr.steamModeSec, a != b {
+            out.append("steam \(a)s → \(b)s")
+        }
+
         if let a = prev.pourCount, let b = curr.pourCount, a != b {
             out.append("\(a) → \(b) pours")
         }

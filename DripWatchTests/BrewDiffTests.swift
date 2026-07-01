@@ -42,6 +42,16 @@ struct BrewDiffTests {
         #expect(c.contains { $0.contains("28s") && $0.contains("30s") })
     }
 
+    @Test func manualMachineTechniqueDeltas() {
+        var a = Recipe(); a.preInfusionSec = 6; a.surfWaitSec = 8; a.steamModeSec = 4
+        var b = Recipe(); b.preInfusionSec = 8; b.surfWaitSec = 11; b.steamModeSec = 4
+        let c = BrewDiff.changes(from: a, to: b)
+        #expect(c.contains("pre-infuse 6s → 8s"))
+        #expect(c.contains("surf 8s → 11s"))
+        // steamMode unchanged → no entry for it.
+        #expect(!c.contains { $0.hasPrefix("steam") })
+    }
+
     @Test func identicalRecipesHaveNoChanges() {
         var a = Recipe(); a.waterTempC = 92; a.ratio = 15
         #expect(BrewDiff.changes(from: a, to: a).isEmpty)

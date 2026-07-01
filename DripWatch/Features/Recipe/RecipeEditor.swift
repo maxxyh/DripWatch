@@ -56,6 +56,7 @@ struct RecipeEditor: View {
     // MARK: Espresso
 
     @ViewBuilder private var espressoFields: some View {
+        // Shot metrics.
         DecimalField(label: "Dose", unit: "g", value: $recipe.doseGrams, systemImage: "scalemass")
         DecimalField(label: "Yield", unit: "g", value: $recipe.yieldGrams, systemImage: "cup.and.saucer")
         if let ratio = recipe.shotRatio {
@@ -70,16 +71,32 @@ struct RecipeEditor: View {
             .accessibilityLabel("Brew ratio 1 to \(ratioText((ratio * 10).rounded() / 10))")
         }
         TimeField(label: "Shot time", seconds: $recipe.shotTimeSec, systemImage: "timer")
-        IntField(label: "Temp", unit: "°C", value: $recipe.waterTempC, range: 80...110, systemImage: "thermometer.medium")
 
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Notes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            TextField("channeling, gusher, updose…",
-                      text: Binding(get: { recipe.notes ?? "" }, set: { recipe.notes = $0.nilIfBlank }),
-                      axis: .vertical)
-                .lineLimit(1...3)
-                .font(.subheadline)
+        // Manual technique — how temperature and pre-infusion are controlled without a PID.
+        Text("Manual technique").overline().padding(.top, 4)
+        IntField(label: "Pre-infusion", unit: "s", value: $recipe.preInfusionSec, range: 0...30, systemImage: "drop.circle")
+        IntField(label: "Surf wait", unit: "s", value: $recipe.surfWaitSec, range: 0...90, systemImage: "clock")
+        IntField(label: "Steam mode", unit: "s", value: $recipe.steamModeSec, range: 0...60, systemImage: "flame")
+
+        // Advanced / future: a real °C reading (once a PID is fitted) plus free-text notes.
+        DisclosureGroup(isExpanded: $showBreakdown) {
+            VStack(alignment: .leading, spacing: 12) {
+                IntField(label: "Temp", unit: "°C", value: $recipe.waterTempC, range: 80...110, systemImage: "thermometer.medium")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Notes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    TextField("channeling, gusher, updose…",
+                              text: Binding(get: { recipe.notes ?? "" }, set: { recipe.notes = $0.nilIfBlank }),
+                              axis: .vertical)
+                        .lineLimit(1...3)
+                        .font(.subheadline)
+                }
+            }
+            .padding(.top, 8)
+        } label: {
+            Label("Measured temp & notes", systemImage: "thermometer.medium")
+                .font(.subheadline.weight(.medium))
         }
+        .tint(Theme.accent)
     }
 }
 
