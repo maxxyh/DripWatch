@@ -1,0 +1,54 @@
+# Xcode / Swift
+## Build artifacts
+build/
+DerivedData/
+*.xcodeproj/*.xcworkspace
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+## User-specific Xcode state (not shared)
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+## Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+## CocoaPods / Carthage (unused, but standard)
+Pods/
+Carthage/Build/
+
+## Obj-C / misc
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Editor / tooling
+*.swp
+*~
+
+# Claude Code — per-user local settings (keep shared settings.json)
+.claude/settings.local.json
+
+# Scratch / generated
+.artifacts/
+.shots/
+.icongen/

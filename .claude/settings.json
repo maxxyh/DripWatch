@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild:*)",
+      "Bash(xcrun:*)",
+      "Bash(swift:*)",
+      "Bash(swiftc:*)",
+      "Bash(open:*)",
+      "Bash(npx:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(echo:*)",
+      "Bash(mkdir:*)",
+      "Bash(plutil:*)",
+      "Bash(cd:*)",
+      "Bash(set:*)",
+      "Bash(defaults:*)",
+      "Bash(sleep:*)",
+      "Bash(grep:*)",
+      "Bash(tail:*)",
+      "Bash(head:*)",
+      "Bash(sips:*)",
+      "Bash(rm:*)"
+    ]
+  }
+}
