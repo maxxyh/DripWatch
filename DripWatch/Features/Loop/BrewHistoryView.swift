@@ -94,6 +94,9 @@ struct BrewRow: View {
             if !brew.taste.balance.isEmpty {
                 TasteBalanceView(balance: brew.taste.balance)
             }
+            if let note = brew.taste.note, !note.isEmpty {
+                Text("“\(note)”").font(.footnote.italic()).foregroundStyle(.secondary)
+            }
         }
     }
 }

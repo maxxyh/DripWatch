@@ -41,7 +41,8 @@ enum SampleData {
             return r
         }())
         b1.taste = { var t = Taste(); t.positives = ["honey"]; t.negatives = ["grapefruit", "bitter"]
-            t.balance = TasteBalance(acidity: 4, sweetness: 3, bitterness: 3, body: 3); t.rating = 3; return t }()
+            t.balance = TasteBalance(acidity: 4, sweetness: 3, bitterness: 3, body: 3); t.rating = 3
+            t.note = "sweet up front but the bitterness built up toward the end"; return t }()
         b1.bean = voyager
         context.insert(b1)
 

@@ -88,9 +88,17 @@ struct BrewCaptureView: View {
             ChipField(title: "Good", items: $taste.positives, tint: Theme.sage, symbol: "plus")
             ChipField(title: "Off", items: $taste.negatives, tint: Theme.clay, symbol: "minus")
 
-            // Optional, folded away — you don't have to grade anything.
+            // A free-text impression for nuance the chips can't hold — one tap away.
             DisclosureGroup(isExpanded: $showBalance) {
                 VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Tasting note").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        TextField("opened up as it cooled, short finish…",
+                                  text: Binding(get: { taste.note ?? "" }, set: { taste.note = $0.nilIfBlank }),
+                                  axis: .vertical)
+                            .lineLimit(1...3)
+                            .font(.subheadline)
+                    }
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Balance").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         TasteBalanceEditor(balance: $taste.balance)
@@ -103,7 +111,7 @@ struct BrewCaptureView: View {
                 }
                 .padding(.top, 8)
             } label: {
-                Label("Rate balance & stars (optional)", systemImage: "slider.horizontal.3")
+                Label("Note, balance & stars (optional)", systemImage: "slider.horizontal.3")
                     .font(.subheadline.weight(.medium))
             }
             .tint(Theme.accent)

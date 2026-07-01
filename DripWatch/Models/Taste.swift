@@ -19,10 +19,14 @@ struct Taste: Codable, Hashable {
     var balance: TasteBalance = TasteBalance()
     /// Optional overall rating, 1…5.
     var rating: Int?
+    /// Optional free-text impression — the nuance/context the +/− chips can't hold
+    /// ("opened up as it cooled", "sweet finish but short").
+    var note: String?
 
     init() {}
 
     var isEmpty: Bool {
         positives.isEmpty && negatives.isEmpty && balance.isEmpty && rating == nil
+            && (note?.isEmpty ?? true)
     }
 }
