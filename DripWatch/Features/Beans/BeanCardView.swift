@@ -7,6 +7,8 @@ struct BeanCardView: View {
     let bean: Bean
     enum Style { case shelf, full }
     var style: Style = .shelf
+    /// When set (detail header), tapping the bag photo opens the full-screen preview.
+    var onTapPhoto: (() -> Void)? = nil
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
@@ -29,7 +31,7 @@ struct BeanCardView: View {
 
     private var photo: some View {
         ZStack {
-            if let data = bean.bagPhoto, let ui = UIImage(data: data) {
+            if let data = bean.primaryPhotoData, let ui = UIImage(data: data) {
                 Image(uiImage: ui)
                     .resizable()
                     .scaledToFill()
@@ -45,6 +47,19 @@ struct BeanCardView: View {
         .frame(height: style == .full ? 220 : 128)
         .frame(maxWidth: .infinity)
         .clipped()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard bean.primaryPhotoData != nil, let onTapPhoto else { return }
+            Haptics.tap(); onTapPhoto()
+        }
+        .overlay(alignment: .topLeading) {
+            // A hint that there's more than one bag surface to swipe through.
+            if bean.photoDatas.count > 1 {
+                Chip(text: "\(bean.photoDatas.count)", symbol: "photo.on.rectangle", tint: .white)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(10)
+            }
+        }
         .overlay(alignment: .topTrailing) {
             // "Brews together" — the relationship counter, not a rank.
             // `.white` is intentional here (not a Theme token): the badge sits on an arbitrary
@@ -80,10 +95,21 @@ struct BeanCardView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                // Roaster's tasting notes on the shelf — the enticement to pick this bag.
+                roasterNoteChips(limit: 3)
             } else {
                 factRows
+                if !bean.roasterNoteList.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Roaster notes").overline()
+                        roasterNoteChips()
+                    }
+                }
                 if !bean.myFlavorTags.isEmpty {
-                    FlowChips(items: bean.myFlavorTags)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Your tags").overline()
+                        FlowChips(items: bean.myFlavorTags)
+                    }
                 }
             }
         }
@@ -93,6 +119,20 @@ struct BeanCardView: View {
 
     private var shelfSubtitle: String? {
         [bean.process, bean.country].compactMap { $0?.isEmpty == false ? $0 : nil }.first
+    }
+
+    /// The roaster's tasting notes as accent chips (a highlight, distinct from origin facts and
+    /// the user's own tags). `limit` caps the shelf tile with a "+N" overflow chip.
+    @ViewBuilder private func roasterNoteChips(limit: Int? = nil) -> some View {
+        let notes = bean.roasterNoteList
+        if !notes.isEmpty {
+            let shown = limit.map { Array(notes.prefix($0)) } ?? notes
+            let extra = notes.count - shown.count
+            WrapLayout(spacing: 6, lineSpacing: 6) {
+                ForEach(shown, id: \.self) { Chip(text: $0, symbol: "sparkles", tint: Theme.accent) }
+                if extra > 0 { Chip(text: "+\(extra)", tint: .secondary) }
+            }
+        }
     }
 
     @ViewBuilder private var factRows: some View {

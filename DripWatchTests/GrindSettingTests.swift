@@ -21,4 +21,11 @@ struct GrindSettingTests {
         let g = GrindSetting(grinderName: "Niche", major: 12, clickOffset: 0)
         #expect(g.settingText == "12")
     }
+
+    @Test func steplessDecimalDisplaysWithoutTrailingZero() {
+        // Whole values read as integers; a stepless setting keeps its half-step.
+        #expect(GrindSetting(grinderName: "DF54", major: 5).majorText == "5")
+        #expect(GrindSetting(grinderName: "DF54", major: 4.5).majorText == "4.5")
+        #expect(GrindSetting(grinderName: "DF54", major: 4.5).display == "DF54 · 4.5")
+    }
 }

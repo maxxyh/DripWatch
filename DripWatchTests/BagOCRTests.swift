@@ -43,6 +43,40 @@ struct BagOCRTests {
         #expect(bag.name == "Pure Forest")
     }
 
+    @Test func labellessBlendClassifiedByContent() {
+        // The "Lazy Sunday" espresso blend: no field labels, just descriptive lines.
+        let lines = [
+            line("Lazy Sunday", x: 0.1, y: 0.9, w: 0.6, h: 0.08),
+            line("Brazil Catuai varietal, Natural", x: 0.1, y: 0.7, w: 0.7),
+            line("Colombia Mix varietal, Washed", x: 0.1, y: 0.6, w: 0.7),
+            line("Caramel Nuttiness, Milk Chocolate", x: 0.1, y: 0.3, w: 0.7),
+            line("Espresso - Medium roast", x: 0.1, y: 0.2, w: 0.7),
+        ]
+        let bag = BagOCR.parse(lines)
+        #expect(bag.name == "Lazy Sunday")
+        #expect(bag.country?.contains("Brazil") == true)
+        #expect(bag.country?.contains("Colombia") == true)
+        #expect(bag.varietal?.contains("Catuai") == true)
+        #expect(bag.process == "Washed" || bag.process == "Natural")
+        #expect(bag.roastLevel == "Medium")
+        #expect(bag.roasterNotes?.lowercased().contains("chocolate") == true)
+    }
+
+    @Test func learnedTermIsClassified() {
+        // A term the user previously filed as a variety is picked up automatically.
+        let lines = [
+            line("Morning Star", x: 0.1, y: 0.9, w: 0.6, h: 0.08),   // the name (largest print)
+            line("Zephyrine", x: 0.1, y: 0.5, w: 0.5),
+        ]
+        let plain = BagOCR.parse(lines)
+        #expect(plain.varietal == nil)
+        #expect(plain.unresolved.contains("Zephyrine"))
+
+        let taught = BagOCR.parse(lines, learned: ["zephyrine": .varietal])
+        #expect(taught.varietal == "Zephyrine")
+        #expect(!taught.unresolved.contains("Zephyrine"))
+    }
+
     @Test func aValueIsNotClaimedByTwoFields() {
         // One value line on a shared row must be consumed by the first matching label only.
         let lines = [

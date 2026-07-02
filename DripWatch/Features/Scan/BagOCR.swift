@@ -7,6 +7,7 @@ import ImageIO
 /// convenience that pre-fills the form; the user always reviews.
 struct ParsedBag {
     var name: String?
+    var country: String?
     var region: String?
     var farm: String?
     var varietal: String?
@@ -14,9 +15,12 @@ struct ParsedBag {
     var roastLevel: String?
     var roasterNotes: String?
     var rawLines: [String] = []
+    /// Meaningful text the parser couldn't confidently file — surfaced for the user to categorize
+    /// (and, once categorized, remembered via `LexiconTerm`).
+    var unresolved: [String] = []
 
     var filledCount: Int {
-        [name, region, farm, varietal, process, roastLevel, roasterNotes].compactMap { $0 }.count
+        [name, country, region, farm, varietal, process, roastLevel, roasterNotes].compactMap { $0 }.count
     }
 }
 
@@ -61,7 +65,7 @@ enum BagOCR {
     /// 2. Columnar — a label column beside a value column; the value is found by position
     ///    (same row band, immediately to the right of the label). Each value line is consumed
     ///    once so two fields can't claim the same value.
-    static func parse(_ lines: [OCRLine]) -> ParsedBag {
+    static func parse(_ lines: [OCRLine], learned: [String: BagField] = [:]) -> ParsedBag {
         var bag = ParsedBag()
         bag.rawLines = lines.map(\.text)
         var consumed = Set<Int>()
@@ -76,8 +80,13 @@ enum BagOCR {
 
         func isLabelLine(_ line: OCRLine) -> Bool {
             let l = line.text.lowercased()
-            return keys.contains { $0.tokens.contains { l.contains($0) } }
+            let hasToken = keys.contains { $0.tokens.contains { l.contains($0) } }
                 || l.contains("roasted") || l.contains("altitude") || l.contains("taste")
+            guard hasToken else { return false }
+            // A real label is a short column header ("VARIETY", "ROAST LEVEL") or an inline
+            // "key: value" — not a descriptive line that merely mentions the word (a blend's
+            // "Brazil Catuai varietal, Natural"), which we still want to classify by content.
+            return l.split(separator: " ").count <= 2 || l.contains(":")
         }
 
         for (tokens, assign) in keys {
@@ -127,7 +136,53 @@ enum BagOCR {
             .max(by: { $0.element.height < $1.element.height })?
             .element.text
 
+        // Content pass: for label-less bags (e.g. a blend printed as "Brazil Catuai varietal,
+        // Natural"), classify each remaining line by *what its words are*. Fills only empty fields
+        // — never overrides a label — and gathers anything it can't place as `unresolved`.
+        var countryParts: [String] = []
+        var varietalParts: [String] = []
+        var noteParts: [String] = []
+        for (i, line) in lines.enumerated() where !consumed.contains(i)
+            && !isLabelLine(line) && !isBoilerplate(line.text) && line.text != bag.name {
+            for segment in line.text.split(separator: ",").map(String.init) {
+                let (matches, unknowns) = CoffeeLexicon.classifySegment(segment, learned: learned)
+                for m in matches {
+                    switch m.field {
+                    case .country: countryParts.append(m.value)
+                    case .varietal: varietalParts.append(m.value)
+                    case .tastingNote: noteParts.append(m.value)
+                    case .process where bag.process == nil: bag.process = m.value
+                    case .roastLevel where bag.roastLevel == nil: bag.roastLevel = m.value
+                    case .region where bag.region == nil: bag.region = m.value
+                    case .farm where bag.farm == nil: bag.farm = m.value
+                    case .name where bag.name == nil: bag.name = m.value
+                    default: break
+                    }
+                }
+                bag.unresolved.append(contentsOf: unknowns)
+            }
+        }
+        if bag.country == nil, !countryParts.isEmpty { bag.country = dedupeJoin(countryParts) }
+        if bag.varietal == nil, !varietalParts.isEmpty { bag.varietal = dedupeJoin(varietalParts) }
+        if bag.roasterNotes == nil, !noteParts.isEmpty { bag.roasterNotes = dedupeJoin(noteParts) }
+
+        // De-duplicate unresolved, and drop anything we ended up filing into a field anyway.
+        let filled = Set([bag.name, bag.country, bag.region, bag.farm, bag.varietal, bag.process,
+                          bag.roastLevel, bag.roasterNotes].compactMap { $0?.lowercased() })
+        var seen = Set<String>()
+        bag.unresolved = bag.unresolved.filter { term in
+            let key = term.lowercased()
+            guard !filled.contains(key), seen.insert(key).inserted else { return false }
+            return true
+        }
+
         return bag
+    }
+
+    /// Joins parts with ", " while dropping case-insensitive duplicates, order preserved.
+    private static func dedupeJoin(_ parts: [String]) -> String {
+        var seen = Set<String>()
+        return parts.filter { seen.insert($0.lowercased()).inserted }.joined(separator: ", ")
     }
 
     // MARK: Helpers

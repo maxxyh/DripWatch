@@ -12,12 +12,15 @@ struct BeanDetailView: View {
     @State private var editingBrew: Brew?
     @State private var editingBean = false
     @State private var confirmingDelete = false
+    @State private var preview: PreviewPhoto?
 
     var body: some View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(spacing: 16) {
-                BeanCardView(bean: bean, style: .full)
+                BeanCardView(bean: bean, style: .full, onTapPhoto: {
+                    if !bean.photoDatas.isEmpty { preview = PreviewPhoto(datas: bean.photoDatas) }
+                })
 
                 if let next = bean.pendingNextPourover {
                     nextPlanCard(next, method: .pourover)
@@ -38,7 +41,10 @@ struct BeanDetailView: View {
                     }
                     .padding(.top, 4)
                     .id("history")
-                    BrewHistoryView(brews: bean.timeline, onEdit: { editingBrew = $0 }, onDelete: delete)
+                    BrewHistoryView(brews: bean.timeline,
+                                    onEdit: { editingBrew = $0 },
+                                    onDelete: delete,
+                                    onTapPhoto: { preview = PreviewPhoto(data: $0) })
                 }
             }
             .padding(Theme.Space.m)
@@ -88,6 +94,7 @@ struct BeanDetailView: View {
             Button("Delete", role: .destructive) { deleteBean() }
             Button("Cancel", role: .cancel) {}
         }
+        .photoViewer($preview)
     }
 
     private func nextPlanCard(_ next: Recipe, method: BrewMethod) -> some View {

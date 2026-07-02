@@ -13,14 +13,27 @@ struct AddBeanView: View {
     /// When set, we're editing this bean rather than creating a new one.
     let editingBean: Bean?
 
-    @State private var photoItem: PhotosPickerItem?
-    @State private var photoData: Data?
+    /// A bag photo being edited — either an existing `BeanPhoto` (kept by identity) or a freshly
+    /// added image not yet persisted.
+    private struct PhotoDraft: Identifiable {
+        let id = UUID()
+        var data: Data
+        var existing: BeanPhoto?
+    }
+
+    @State private var photoDrafts: [PhotoDraft]
+    @State private var photoItems: [PhotosPickerItem] = []
     @State private var scanning = false
     @State private var scanNote: String?
+    @State private var preview: PreviewPhoto?
 
     @State private var showPhotoOptions = false
     @State private var showLibrary = false
     @State private var showCamera = false
+
+    @Query private var lexiconTerms: [LexiconTerm]
+    /// Terms OCR couldn't file, awaiting the user's category choice.
+    @State private var unresolved: [String] = []
 
     @State private var name: String
     @State private var roaster: String
@@ -32,7 +45,8 @@ struct AddBeanView: View {
     @State private var roastLevel: String
     @State private var hasRoastDate: Bool
     @State private var roastDate: Date
-    @State private var roasterNotes: String
+    /// Roaster's tasting notes as chips (stored comma-joined on the bean).
+    @State private var roasterNoteTags: [String]
 
     private static let processPresets = ["Washed", "Natural", "Honey", "Anaerobic"]
     private static let roastPresets = ["Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"]
@@ -50,8 +64,19 @@ struct AddBeanView: View {
         // Default roast date ON for new beans (we only buy dated bags); reflect reality when editing.
         _hasRoastDate = State(initialValue: bean == nil ? true : (bean?.roastDate != nil))
         _roastDate = State(initialValue: bean?.roastDate ?? .now)
-        _roasterNotes = State(initialValue: bean?.roasterNotes ?? "")
-        _photoData = State(initialValue: bean?.bagPhoto)
+        _roasterNoteTags = State(initialValue: bean?.roasterNoteList ?? [])
+
+        // Load existing gallery (by identity so unchanged photos aren't re-inserted), falling
+        // back to the legacy single photo — which will migrate into the gallery on save.
+        var drafts: [PhotoDraft] = []
+        if let bean {
+            if !bean.orderedPhotos.isEmpty {
+                drafts = bean.orderedPhotos.compactMap { p in p.data.map { PhotoDraft(data: $0, existing: p) } }
+            } else if let legacy = bean.bagPhoto {
+                drafts = [PhotoDraft(data: legacy, existing: nil)]
+            }
+        }
+        _photoDrafts = State(initialValue: drafts)
     }
 
     private var isEditing: Bool { editingBean != nil }
@@ -64,6 +89,7 @@ struct AddBeanView: View {
                     LabeledTextField(label: "Name", placeholder: "e.g. Pure Forest", text: $name)
                     LabeledTextField(label: "Roaster", placeholder: "e.g. Nylon", text: $roaster)
                 }
+                unresolvedSection
                 Section("Origin") {
                     LabeledTextField(label: "Country", placeholder: "e.g. Ethiopia", text: $country)
                     LabeledTextField(label: "Region", placeholder: "e.g. Guji", text: $region)
@@ -84,9 +110,13 @@ struct AddBeanView: View {
                         DatePicker("Roasted on", selection: $roastDate, in: ...Date.now, displayedComponents: .date)
                     }
                 }
-                Section("Roaster's notes") {
-                    TextField("Tastes like…", text: $roasterNotes, axis: .vertical)
-                        .lineLimit(2...4)
+                Section {
+                    ChipField(title: "", items: $roasterNoteTags, tint: Theme.accent,
+                              symbol: "sparkles", autocapitalization: .words)
+                } header: {
+                    Text("Roaster's notes")
+                } footer: {
+                    Text("The roaster's tasting notes — shown on the shelf and while you taste.")
                 }
             }
             .navigationTitle(isEditing ? "Edit Bean" : "New Bean")
@@ -101,74 +131,52 @@ struct AddBeanView: View {
                         .disabled(!canSave)
                 }
             }
-            .task(id: photoItem) {
-                if let photoItem, let data = try? await photoItem.loadTransferable(type: Data.self) {
-                    photoData = downscale(data)
+            .task(id: photoItems) {
+                guard !photoItems.isEmpty else { return }
+                for item in photoItems {
+                    if let data = try? await item.loadTransferable(type: Data.self) {
+                        appendPhoto(downscale(data))
+                    }
                 }
+                photoItems = []
             }
-            .photosPicker(isPresented: $showLibrary, selection: $photoItem, matching: .images)
+            .photosPicker(isPresented: $showLibrary, selection: $photoItems,
+                          maxSelectionCount: 5, matching: .images)
             .fullScreenCover(isPresented: $showCamera) {
-                CameraPicker { data in photoData = downscale(data) }
+                CameraPicker { data in appendPhoto(downscale(data)) }
                     .ignoresSafeArea()
             }
-            .confirmationDialog("Bag photo", isPresented: $showPhotoOptions, titleVisibility: .visible) {
+            .confirmationDialog("Add bag photo", isPresented: $showPhotoOptions, titleVisibility: .visible) {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
                     Button("Take Photo") { showCamera = true }
                 }
                 Button("Choose from Library") { showLibrary = true }
-                if photoData != nil {
-                    Button("Remove Photo", role: .destructive) { photoData = nil; photoItem = nil; scanNote = nil }
-                }
             }
+            .photoViewer($preview)
         }
     }
 
-    // MARK: Photo
+    // MARK: Photos
 
     private var photoSection: some View {
         Section {
-            Button {
-                Haptics.tap()
-                showPhotoOptions = true
-            } label: {
-                ZStack(alignment: .bottomTrailing) {
-                    if let photoData, let ui = UIImage(data: photoData) {
-                        Image(uiImage: ui)
-                            .resizable().scaledToFill()
-                            .frame(height: 200)
-                            .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        Text("Tap to change")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(.ultraThinMaterial, in: Capsule())
-                            .padding(10)
-                    } else {
-                        ZStack {
-                            Theme.crema.opacity(0.18)
-                            VStack(spacing: 8) {
-                                Image(systemName: "camera.fill").font(.title)
-                                Text("Add bag photo").font(.subheadline.weight(.medium))
-                            }
-                            .foregroundStyle(Theme.accent)
-                        }
-                        .frame(height: 200)
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(photoDrafts) { draft in photoThumb(draft) }
+                    addPhotoTile
                 }
+                .padding(.vertical, 4)
             }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .accessibilityLabel(photoData == nil ? "Add bag photo" : "Change bag photo")
+            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
 
-            if photoData != nil {
+            if !photoDrafts.isEmpty {
                 Button {
                     Task { await scan() }
                 } label: {
                     HStack {
                         if scanning { ProgressView().controlSize(.small) }
-                        Label(scanning ? "Scanning…" : "Scan text from photo",
+                        Label(scanning ? "Scanning…"
+                                       : "Scan text from \(photoDrafts.count == 1 ? "photo" : "\(photoDrafts.count) photos")",
                               systemImage: "text.viewfinder")
                     }
                 }
@@ -177,41 +185,224 @@ struct AddBeanView: View {
                     Text(scanNote).font(.caption).foregroundStyle(.secondary)
                 }
             }
+        } footer: {
+            Text("Add each surface the roaster prints on — all are scanned together.")
         }
+    }
+
+    private func photoThumb(_ draft: PhotoDraft) -> some View {
+        ZStack(alignment: .topTrailing) {
+            if let ui = UIImage(data: draft.data) {
+                Image(uiImage: ui)
+                    .resizable().scaledToFill()
+                    .frame(width: 108, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        Haptics.tap()
+                        let idx = photoDrafts.firstIndex { $0.id == draft.id } ?? 0
+                        preview = PreviewPhoto(datas: photoDrafts.map(\.data), index: idx)
+                    }
+            }
+            Button {
+                Haptics.tap()
+                photoDrafts.removeAll { $0.id == draft.id }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white, .black.opacity(0.5))
+                    .padding(5)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove photo")
+        }
+    }
+
+    private var addPhotoTile: some View {
+        Button {
+            Haptics.tap()
+            showPhotoOptions = true
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: "camera.fill").font(.title2)
+                Text(photoDrafts.isEmpty ? "Add bag photo" : "Add").font(.caption.weight(.medium))
+            }
+            .foregroundStyle(Theme.accent)
+            .frame(width: 108, height: 140)
+            .background(Theme.crema.opacity(0.18), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Theme.accent.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add bag photo")
+    }
+
+    private func appendPhoto(_ data: Data) {
+        photoDrafts.append(PhotoDraft(data: data, existing: nil))
     }
 
     // MARK: OCR
 
-    /// Runs on-device OCR and fills any fields the user hasn't already typed into.
+    /// Runs on-device OCR across *all* the bag photos, merges the results, and fills any fields
+    /// the user hasn't already typed into. Roasters often split facts across surfaces, so a
+    /// value found on any one photo counts.
     @MainActor private func scan() async {
-        guard let photoData else { return }
+        guard !photoDrafts.isEmpty else { return }
         scanning = true
         defer { scanning = false }
-        let lines = await BagOCR.recognize(from: photoData)
-        guard !lines.isEmpty else { scanNote = "No text found — try a clearer, straight-on photo."; return }
-        let bag = BagOCR.parse(lines)
+
+        var merged = ParsedBag()
+        var found = false
+        for draft in photoDrafts {
+            let lines = await BagOCR.recognize(from: draft.data)
+            guard !lines.isEmpty else { continue }
+            found = true
+            merged = mergeBags(merged, BagOCR.parse(lines, learned: learnedMap))
+        }
+        guard found else { scanNote = "No text found — try clearer, straight-on photos."; return }
 
         var filled = 0
         func fill(_ field: inout String, _ value: String?) {
             guard field.isEmpty, let value, !value.isEmpty else { return }
             field = value; filled += 1
         }
-        fill(&name, bag.name)
-        fill(&region, bag.region)
-        fill(&farm, bag.farm)
-        fill(&varietal, bag.varietal)
-        fill(&process, bag.process)
-        fill(&roastLevel, bag.roastLevel)
-        fill(&roasterNotes, bag.roasterNotes)
+        fill(&name, merged.name)
+        fill(&country, merged.country)
+        fill(&region, merged.region)
+        fill(&farm, merged.farm)
+        fill(&varietal, merged.varietal)
+        fill(&process, merged.process)
+        fill(&roastLevel, merged.roastLevel)
+        if roasterNoteTags.isEmpty {
+            roasterNoteTags = splitTags(merged.roasterNotes)
+            if !roasterNoteTags.isEmpty { filled += 1 }
+        }
+        unresolved = mergeUnique(unresolved, merged.unresolved)
 
-        scanNote = filled > 0 ? "Filled \(filled) field\(filled == 1 ? "" : "s") — check the labels below." : "Couldn't map fields — edit manually."
-        if filled > 0 { Haptics.success() } else { Haptics.tap() }
+        var parts: [String] = []
+        if filled > 0 { parts.append("Filled \(filled) field\(filled == 1 ? "" : "s")") }
+        if !unresolved.isEmpty { parts.append("\(unresolved.count) to file below") }
+        scanNote = parts.isEmpty ? "Couldn't map fields — edit manually." : parts.joined(separator: " · ")
+        if filled > 0 || !unresolved.isEmpty { Haptics.success() } else { Haptics.tap() }
+    }
+
+    /// Merge two parsed bags: single-value fields take the first found; list-style fields
+    /// (country / variety / roaster notes) union their entries; unknowns pool together.
+    private func mergeBags(_ a: ParsedBag, _ b: ParsedBag) -> ParsedBag {
+        var m = a
+        m.name = a.name ?? b.name
+        m.region = a.region ?? b.region
+        m.farm = a.farm ?? b.farm
+        m.process = a.process ?? b.process
+        m.roastLevel = a.roastLevel ?? b.roastLevel
+        m.country = joinLists(a.country, b.country)
+        m.varietal = joinLists(a.varietal, b.varietal)
+        m.roasterNotes = joinLists(a.roasterNotes, b.roasterNotes)
+        m.unresolved = mergeUnique(a.unresolved, b.unresolved)
+        return m
+    }
+
+    private func joinLists(_ a: String?, _ b: String?) -> String? {
+        let items = mergeUnique(splitTags(a), splitTags(b))
+        return items.isEmpty ? nil : items.joined(separator: ", ")
+    }
+
+    private func splitTags(_ s: String?) -> [String] {
+        (s ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    private func mergeUnique(_ a: [String], _ b: [String]) -> [String] {
+        var seen = Set<String>()
+        return (a + b).filter { seen.insert($0.lowercased()).inserted }
+    }
+
+    /// User-taught terms, lowercased → field, consulted first when parsing.
+    private var learnedMap: [String: BagField] {
+        Dictionary(lexiconTerms.filter { $0.deletedAt == nil }.map { ($0.term, $0.field) },
+                   uniquingKeysWith: { first, _ in first })
+    }
+
+    // MARK: Interactive term filing
+
+    /// "We're not sure what these are" — each unknown term gets a menu to file it into a field.
+    /// Filing both fills the field now and remembers the term so it auto-files next time.
+    @ViewBuilder private var unresolvedSection: some View {
+        if !unresolved.isEmpty {
+            Section("Not sure what these are") {
+                Text("Tap a term to file it — DripWatch remembers your choice for next time.")
+                    .font(.caption).foregroundStyle(.secondary)
+                WrapLayout(spacing: 6, lineSpacing: 6) {
+                    ForEach(unresolved, id: \.self) { term in
+                        Menu {
+                            ForEach(BagField.allCases) { field in
+                                Button { assign(term, to: field) } label: {
+                                    Label(field.label, systemImage: field.symbol)
+                                }
+                            }
+                            Divider()
+                            Button(role: .destructive) { ignore(term) } label: {
+                                Label("Ignore", systemImage: "xmark")
+                            }
+                        } label: {
+                            Chip(text: term, symbol: "questionmark.circle", tint: Theme.accent)
+                        }
+                        .accessibilityLabel("Unfiled term \(term). Tap to choose a category.")
+                    }
+                }
+            }
+        }
+    }
+
+    /// File a term into a field (appending when the field already holds a value), remember it, and
+    /// clear it from the unresolved list.
+    private func assign(_ term: String, to field: BagField) {
+        Haptics.success()
+        appendValue(term, to: field)
+        rememberTerm(term, field: field)
+        ignore(term)
+    }
+
+    private func ignore(_ term: String) {
+        unresolved.removeAll { $0 == term }
+    }
+
+    private func appendValue(_ value: String, to field: BagField) {
+        func set(_ target: inout String) {
+            target = target.isEmpty ? value : target + ", " + value
+        }
+        switch field {
+        case .name: set(&name)
+        case .roaster: set(&roaster)
+        case .country: set(&country)
+        case .region: set(&region)
+        case .farm: set(&farm)
+        case .varietal: set(&varietal)
+        case .process: set(&process)
+        case .roastLevel: set(&roastLevel)
+        case .tastingNote:
+            if !roasterNoteTags.contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) {
+                roasterNoteTags.append(value)
+            }
+        }
+    }
+
+    /// Upsert a learned term so future scans classify it automatically.
+    private func rememberTerm(_ term: String, field: BagField) {
+        let key = term.lowercased()
+        if let existing = lexiconTerms.first(where: { $0.deletedAt == nil && $0.term == key }) {
+            existing.field = field
+            existing.updatedAt = .now
+        } else {
+            context.insert(LexiconTerm(term: key, field: field))
+        }
     }
 
     // MARK: Save
 
     /// Save is allowed with just a photo or just a name — the card works from either.
-    private var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty || photoData != nil }
+    private var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty || !photoDrafts.isEmpty }
 
     private func save() {
         let bean = editingBean ?? Bean()
@@ -224,12 +415,33 @@ struct AddBeanView: View {
         bean.process = process.nilIfBlank
         bean.roastLevel = roastLevel.nilIfBlank
         bean.roastDate = hasRoastDate ? roastDate : nil
-        bean.roasterNotes = roasterNotes.nilIfBlank
-        bean.bagPhoto = photoData
+        bean.roasterNotes = roasterNoteTags.isEmpty ? nil : roasterNoteTags.joined(separator: ", ")
         bean.updatedAt = .now
         if editingBean == nil { context.insert(bean) }
+        applyPhotos(to: bean)
         Haptics.success()
         dismiss()
+    }
+
+    /// Reconcile the edited gallery onto the bean: soft-delete removed photos, reorder kept ones,
+    /// insert new ones, and retire the legacy single photo (now represented in `photos`).
+    private func applyPhotos(to bean: Bean) {
+        let kept = Set(photoDrafts.compactMap { $0.existing?.id })
+        for photo in bean.photos where photo.deletedAt == nil && !kept.contains(photo.id) {
+            photo.deletedAt = .now
+            photo.updatedAt = .now
+        }
+        for (index, draft) in photoDrafts.enumerated() {
+            if let existing = draft.existing {
+                existing.order = index
+                existing.updatedAt = .now
+            } else {
+                let photo = BeanPhoto(data: draft.data, order: index)
+                photo.bean = bean
+                context.insert(photo)
+            }
+        }
+        bean.bagPhoto = nil
     }
 }
 

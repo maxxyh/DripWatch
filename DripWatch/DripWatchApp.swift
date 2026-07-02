@@ -8,8 +8,10 @@ struct DripWatchApp: App {
     let container: ModelContainer = {
         let schema = Schema([
             Bean.self,
+            BeanPhoto.self,
             Brew.self,
             Grinder.self,
+            LexiconTerm.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {

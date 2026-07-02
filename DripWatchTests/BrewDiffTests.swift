@@ -3,7 +3,7 @@ import Testing
 
 struct BrewDiffTests {
 
-    private func grind(_ name: String, _ major: Int, _ offset: Int) -> GrindSetting {
+    private func grind(_ name: String, _ major: Double, _ offset: Int) -> GrindSetting {
         GrindSetting(grinderName: name, major: major, clickOffset: offset)
     }
 
@@ -26,6 +26,16 @@ struct BrewDiffTests {
         let changes = BrewDiff.changes(from: a, to: b)
         #expect(!changes.contains { $0.contains("finer") || $0.contains("coarser") })
         #expect(changes.contains { $0.contains("12") && $0.contains("11") })
+    }
+
+    @Test func steplessDecimalShowsAbsoluteChangeNotDirection() {
+        // A stepless grinder (DF54) records a decimal; across a change we show 4.5 → 5, never a
+        // (grinder-specific) finer/coarser claim.
+        var a = Recipe(); a.grind = grind("DF54", 4.5, 0)
+        var b = Recipe(); b.grind = grind("DF54", 5, 0)
+        let changes = BrewDiff.changes(from: a, to: b)
+        #expect(!changes.contains { $0.contains("finer") || $0.contains("coarser") })
+        #expect(changes.contains { $0.contains("4.5") && $0.contains("5") })
     }
 
     @Test func temperatureDirection() {

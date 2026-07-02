@@ -12,7 +12,12 @@ final class Grinder: Syncable {
 
     var name: String = ""
 
-    init(name: String = "") {
+    /// A stepless grinder (worm-drive, e.g. DF54) is dialled to a continuous number rather than
+    /// counted in clicks — the picker offers a ruler + decimal instead of a dial + click offset.
+    var stepless: Bool = false
+
+    init(name: String = "", stepless: Bool = false) {
         self.name = name
+        self.stepless = stepless
     }
 }

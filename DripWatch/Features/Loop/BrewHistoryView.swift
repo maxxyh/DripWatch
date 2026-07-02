@@ -8,13 +8,14 @@ struct BrewHistoryView: View {
     let brews: [Brew]   // newest first
     var onEdit: (Brew) -> Void = { _ in }
     var onDelete: (Brew) -> Void = { _ in }
+    var onTapPhoto: (Data) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(Array(brews.enumerated()), id: \.element.id) { index, brew in
                 // The previous brew chronologically is the next one in this newest-first list.
                 let previous = index + 1 < brews.count ? brews[index + 1] : nil
-                BrewRow(brew: brew, previous: previous, onEdit: { onEdit(brew) }, onDelete: { onDelete(brew) })
+                BrewRow(brew: brew, previous: previous, onEdit: { onEdit(brew) }, onDelete: { onDelete(brew) }, onTapPhoto: onTapPhoto)
                     .contextMenu {
                         Button { onEdit(brew) } label: { Label("Edit brew", systemImage: "pencil") }
                         Button(role: .destructive) { onDelete(brew) } label: {
@@ -32,6 +33,7 @@ struct BrewRow: View {
     var previous: Brew?
     var onEdit: () -> Void = {}
     var onDelete: () -> Void = {}
+    var onTapPhoto: (Data) -> Void = { _ in }
 
     private var diff: [String] {
         guard let previous else { return [] }
@@ -74,6 +76,17 @@ struct BrewRow: View {
 
             // The full absolute recipe.
             RecipeReadout(recipe: brew.recipe)
+
+            // Optional result photo (latte art, crema) — tap to view full-screen.
+            if let data = brew.photo, let ui = UIImage(data: data) {
+                Image(uiImage: ui)
+                    .resizable().scaledToFill()
+                    .frame(maxWidth: .infinity).frame(height: 160)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .contentShape(Rectangle())
+                    .onTapGesture { Haptics.tap(); onTapPhoto(data) }
+                    .accessibilityLabel("Brew photo. Tap to view.")
+            }
 
             // Tasting notes.
             if !brew.taste.isEmpty {

@@ -24,8 +24,15 @@ final class Bean: Syncable {
     var roasterNotes: String?
     var myFlavorTags: [String] = []
 
-    /// The bag photo — the card's hero visual. Stored outside the main store for size.
+    /// Legacy single hero photo. Superseded by `photos` (multiple bag surfaces); kept so existing
+    /// beans keep their shot, and folded into `photoDatas` as a fallback. Migrated into `photos`
+    /// the next time the bean is edited.
     @Attribute(.externalStorage) var bagPhoto: Data?
+
+    /// Bag photos — some roasters print facts across several surfaces, so a bean can hold a
+    /// gallery. The first (by `order`) is the card's hero visual; all are OCR'd together.
+    @Relationship(deleteRule: .cascade, inverse: \BeanPhoto.bean)
+    var photos: [BeanPhoto] = []
 
     /// Drafts of the next brew's recipe, jotted while tasting — kept per method since espresso
     /// and pourover recipes are shaped differently. Seed the next brew of that method.
@@ -38,6 +45,31 @@ final class Bean: Syncable {
     init(name: String = "") {
         self.name = name
     }
+
+    /// Roaster's printed tasting notes as individual chips (stored comma-joined). The roaster's
+    /// notes are a tasting reference maxx leans on, so they render as chips across the app.
+    var roasterNoteList: [String] {
+        (roasterNotes ?? "")
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Active photos, hero first. Empty relationship falls back to the legacy `bagPhoto`.
+    var orderedPhotos: [BeanPhoto] {
+        photos.filter { $0.deletedAt == nil && $0.data != nil }.sorted { $0.order < $1.order }
+    }
+
+    /// Every bag image as raw data, hero first — the gallery, with legacy fallback.
+    var photoDatas: [Data] {
+        let list = orderedPhotos.compactMap(\.data)
+        if !list.isEmpty { return list }
+        if let bagPhoto { return [bagPhoto] }
+        return []
+    }
+
+    /// The hero visual — first gallery photo, else the legacy single photo.
+    var primaryPhotoData: Data? { photoDatas.first }
 
     /// Active brews, newest first — the history log.
     var timeline: [Brew] {

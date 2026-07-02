@@ -28,6 +28,10 @@ final class Brew: Syncable {
     var taste: Taste = Taste()
     var nextRecipeDraft: Recipe?
 
+    /// An optional shot of the result — latte art, the crema, the cup. Stored outside the main
+    /// store for size, like the bag photo. Purely for the memory; nothing depends on it.
+    @Attribute(.externalStorage) var photo: Data?
+
     var bean: Bean?
 
     init(brewedAt: Date = .now, method: BrewMethod = .pourover, recipe: Recipe = Recipe()) {

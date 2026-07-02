@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 /// Log a brew (pourover or espresso), taste it, and — right there while tasting — draft the
 /// next brew, all in the same reusable editor. Seeds from the bean's pending draft (or the
@@ -20,6 +21,14 @@ struct BrewCaptureView: View {
     @State private var planNext: Bool
     @State private var nextDraft: Recipe
 
+    // Optional result photo (latte art, crema, the cup).
+    @State private var photoData: Data?
+    @State private var photoItem: PhotosPickerItem?
+    @State private var showPhotoOptions = false
+    @State private var showLibrary = false
+    @State private var showCamera = false
+    @State private var preview: PreviewPhoto?
+
     init(bean: Bean, method: BrewMethod = .pourover, editing: Brew? = nil) {
         self.bean = bean
         self.method = editing?.method ?? method
@@ -32,6 +41,7 @@ struct BrewCaptureView: View {
             _taste = State(initialValue: editing.taste)
             _planNext = State(initialValue: editing.nextRecipeDraft != nil)
             _nextDraft = State(initialValue: editing.nextRecipeDraft ?? editing.recipe)
+            _photoData = State(initialValue: editing.photo)
         } else {
             // New brew: seed only from a previous brew of the SAME method (recipes differ by method).
             let seed = bean.seedRecipe(for: editing?.method ?? method)
@@ -51,6 +61,7 @@ struct BrewCaptureView: View {
                     header
                     recipeCard
                     tasteCard
+                    photoCard
                     nextCard
                 }
                 .padding(Theme.Space.m)
@@ -65,6 +76,25 @@ struct BrewCaptureView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            .task(id: photoItem) {
+                if let photoItem, let data = try? await photoItem.loadTransferable(type: Data.self) {
+                    photoData = downscale(data)
+                }
+            }
+            .photosPicker(isPresented: $showLibrary, selection: $photoItem, matching: .images)
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPicker { data in photoData = downscale(data) }.ignoresSafeArea()
+            }
+            .confirmationDialog("Brew photo", isPresented: $showPhotoOptions, titleVisibility: .visible) {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("Take Photo") { showCamera = true }
+                }
+                Button("Choose from Library") { showLibrary = true }
+                if photoData != nil {
+                    Button("Remove Photo", role: .destructive) { photoData = nil; photoItem = nil }
+                }
+            }
+            .photoViewer($preview)
         }
     }
 
@@ -99,6 +129,18 @@ struct BrewCaptureView: View {
         VStack(alignment: .leading, spacing: 14) {
             sectionTitle("How did it taste?", systemImage: "mouth")
 
+            // The roaster's own notes, as a reference to taste against.
+            if !bean.roasterNoteList.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Roaster notes").overline()
+                    WrapLayout(spacing: 6, lineSpacing: 6) {
+                        ForEach(bean.roasterNoteList, id: \.self) {
+                            Chip(text: $0, symbol: "sparkles", tint: Theme.accent)
+                        }
+                    }
+                }
+            }
+
             // The everyday taste input: what was good, what was bad.
             ChipField(title: "Good", items: $taste.positives, tint: Theme.sage, symbol: "plus")
             ChipField(title: "Bad", items: $taste.negatives, tint: Theme.clay, symbol: "minus")
@@ -130,6 +172,49 @@ struct BrewCaptureView: View {
                     .font(.subheadline.weight(.medium))
             }
             .tint(Theme.accent)
+        }
+        .dripCard()
+    }
+
+    private var photoCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Photo", systemImage: "camera")
+            if let data = photoData, let ui = UIImage(data: data) {
+                Image(uiImage: ui)
+                    .resizable().scaledToFill()
+                    .frame(height: 200).frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(Rectangle())
+                    .onTapGesture { Haptics.tap(); preview = PreviewPhoto(data: data) }
+                    .accessibilityLabel("Brew photo. Tap to preview.")
+                HStack {
+                    Button { Haptics.tap(); showPhotoOptions = true } label: {
+                        Label("Change", systemImage: "photo")
+                    }
+                    Spacer()
+                    Button(role: .destructive) { photoData = nil; photoItem = nil } label: {
+                        Label("Remove", systemImage: "trash")
+                    }
+                }
+                .font(.subheadline)
+            } else {
+                Button {
+                    Haptics.tap(); showPhotoOptions = true
+                } label: {
+                    ZStack {
+                        Theme.crema.opacity(0.18)
+                        VStack(spacing: 8) {
+                            Image(systemName: "camera.fill").font(.title)
+                            Text("Add a photo").font(.subheadline.weight(.medium))
+                        }
+                        .foregroundStyle(Theme.accent)
+                    }
+                    .frame(height: 120).frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add a brew photo")
+            }
         }
         .dripCard()
     }
@@ -173,6 +258,7 @@ struct BrewCaptureView: View {
         }
         brew.taste = taste
         brew.nextRecipeDraft = planNext ? nextDraft : nil
+        brew.photo = photoData
 
         // The plan becomes the bean's pending seed for next time — but only if this is the
         // newest brew of its method (editing an older brew shouldn't clobber the current plan).
@@ -194,13 +280,18 @@ struct ChipField: View {
     let title: String
     @Binding var items: [String]
     var tint: Color
-    var symbol: String
+    var symbol: String? = nil
+    var autocapitalization: TextInputAutocapitalization = .never
     @State private var entry = ""
     @FocusState private var focused: Bool
 
+    private var placeholder: String { title.isEmpty ? "Add…" : "Add \(title.lowercased())…" }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            if !title.isEmpty {
+                Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
             if !items.isEmpty {
                 WrapLayout(spacing: 6, lineSpacing: 6) {
                     ForEach(items, id: \.self) { item in
@@ -212,13 +303,13 @@ struct ChipField: View {
                                 .hitTarget()
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(item), \(title). Tap to remove.")
+                        .accessibilityLabel("\(item)\(title.isEmpty ? "" : ", \(title)"). Tap to remove.")
                     }
                 }
             }
             HStack {
-                TextField("Add \(title.lowercased())…", text: $entry)
-                    .textInputAutocapitalization(.never)
+                TextField(placeholder, text: $entry)
+                    .textInputAutocapitalization(autocapitalization)
                     .font(.subheadline)
                     .focused($focused)
                     .onSubmit(add)
