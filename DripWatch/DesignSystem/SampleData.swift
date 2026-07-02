@@ -36,8 +36,10 @@ enum SampleData {
             r.grind = GrindSetting(grinderName: jMax, major: 3, clickOffset: 0)
             r.waterTempC = 92; r.doseGrams = 15; r.ratio = 16; r.pourCount = 4
             r.totalDrawdownSec = 135
-            r.pours = [Pour(order: 1, toGrams: 50), Pour(order: 2, toGrams: 150),
-                       Pour(order: 3, toGrams: 220), Pour(order: 4, toGrams: 320, style: "centre")]
+            r.pours = [Pour(order: 1, toGrams: 50, startSec: 0, endSec: 12),
+                       Pour(order: 2, toGrams: 150, startSec: 45, endSec: 58),
+                       Pour(order: 3, toGrams: 220, startSec: 80, endSec: 92),
+                       Pour(order: 4, toGrams: 320, startSec: 105, endSec: 118, style: "centre")]
             return r
         }())
         b1.taste = { var t = Taste(); t.positives = ["honey"]; t.negatives = ["grapefruit", "bitter"]

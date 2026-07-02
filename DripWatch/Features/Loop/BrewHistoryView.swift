@@ -6,6 +6,7 @@ import SwiftData
 /// notebook's arrow made legible — as an annotation above the always-shown absolute recipe.
 struct BrewHistoryView: View {
     let brews: [Brew]   // newest first
+    var onEdit: (Brew) -> Void = { _ in }
     var onDelete: (Brew) -> Void = { _ in }
 
     var body: some View {
@@ -13,8 +14,9 @@ struct BrewHistoryView: View {
             ForEach(Array(brews.enumerated()), id: \.element.id) { index, brew in
                 // The previous brew chronologically is the next one in this newest-first list.
                 let previous = index + 1 < brews.count ? brews[index + 1] : nil
-                BrewRow(brew: brew, previous: previous)
+                BrewRow(brew: brew, previous: previous, onEdit: { onEdit(brew) }, onDelete: { onDelete(brew) })
                     .contextMenu {
+                        Button { onEdit(brew) } label: { Label("Edit brew", systemImage: "pencil") }
                         Button(role: .destructive) { onDelete(brew) } label: {
                             Label("Delete brew", systemImage: "trash")
                         }
@@ -28,6 +30,8 @@ struct BrewHistoryView: View {
 struct BrewRow: View {
     let brew: Brew
     var previous: Brew?
+    var onEdit: () -> Void = {}
+    var onDelete: () -> Void = {}
 
     private var diff: [String] {
         guard let previous else { return [] }
@@ -48,6 +52,15 @@ struct BrewRow: View {
                     }
                     .accessibilityLabel("\(rating) star rating")
                 }
+                Menu {
+                    Button { onEdit() } label: { Label("Edit brew", systemImage: "pencil") }
+                    Button(role: .destructive) { onDelete() } label: {
+                        Label("Delete brew", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle").imageScale(.medium).foregroundStyle(.secondary).hitTarget(36)
+                }
+                .accessibilityLabel("Brew options")
             }
 
             // Change annotation vs. the previous brew (never replaces the absolute recipe below).
@@ -101,6 +114,45 @@ struct BrewRow: View {
     }
 }
 
+/// A read-only "shape of the brew": each timed pour drawn as a segment on a 0→total bar, so the
+/// rhythm (pours vs. the drawdown gaps between them) is legible at a glance.
+struct PourTimeline: View {
+    let pours: [Pour]   // only pours with both start and end
+    let totalSec: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            GeometryReader { geo in
+                let w = geo.size.width
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.crema.opacity(0.6)).frame(height: 6)
+                    if totalSec > 0 {
+                        ForEach(pours) { p in
+                            if let s = p.startSec, let e = p.endSec {
+                                Capsule().fill(Theme.accent)
+                                    .frame(width: max(3, CGFloat(e - s) / CGFloat(totalSec) * w), height: 6)
+                                    .offset(x: CGFloat(s) / CGFloat(totalSec) * w)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 6)
+            }
+            .frame(height: 6)
+            HStack {
+                Text("0:00").font(.caption2).foregroundStyle(.tertiary)
+                Spacer()
+                Text(timeText(totalSec)).font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Pour timeline: " + pours.compactMap { p in
+            guard let s = p.startSec, let e = p.endSec else { return nil }
+            return "pour \(p.order), \(timeText(s)) to \(timeText(e))"
+        }.joined(separator: ", "))
+    }
+}
+
 /// A compact, complete readout of a recipe's absolute values.
 struct RecipeReadout: View {
     let recipe: Recipe
@@ -130,11 +182,18 @@ struct RecipeReadout: View {
         .padding(.vertical, 2)
 
         if recipe.hasPourBreakdown {
-            let steps = recipe.pours.sorted { $0.order < $1.order }
+            let sorted = recipe.pours.sorted { $0.order < $1.order }
+            let steps = sorted
                 .compactMap { p in p.toGrams.map { "\(gramText($0))g" } }
                 .joined(separator: " → ")
             if !steps.isEmpty {
                 Text(steps).font(.param(.caption)).foregroundStyle(.secondary)
+            }
+            // The "shape of the brew": each pour as a segment on a 0→total timeline.
+            let timed = sorted.filter { $0.startSec != nil && $0.endSec != nil }
+            if !timed.isEmpty {
+                let total = max(recipe.totalDrawdownSec ?? 0, timed.compactMap(\.endSec).max() ?? 0)
+                PourTimeline(pours: timed, totalSec: total).padding(.top, 2)
             }
         }
         if let notes = recipe.notes, !notes.isEmpty {

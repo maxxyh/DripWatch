@@ -41,6 +41,26 @@ struct RecipeTests {
         #expect(r.hasPourBreakdown)
     }
 
+    @Test func suggestedTargetsSplitEvenlyWithoutDose() {
+        var r = Recipe(); r.totalWaterGrams = 240
+        // No dose → even cumulative split, landing exactly on the total.
+        #expect(r.suggestedCumulativeTargets(count: 4) == [60, 120, 180, 240])
+    }
+
+    @Test func suggestedTargetsAreBloomAwareWithDose() {
+        var r = Recipe(); r.doseGrams = 15; r.ratio = 16   // total = 240, bloom = 45
+        let t = r.suggestedCumulativeTargets(count: 4)
+        #expect(t.first == 45)          // bloom ≈ 3× dose
+        #expect(t.last == 240)          // ends on the total
+        #expect(t.count == 4)
+        #expect(t == t.sorted())        // strictly cumulative
+    }
+
+    @Test func suggestedTargetsEmptyWithoutTotal() {
+        let r = Recipe()
+        #expect(r.suggestedCumulativeTargets(count: 4).isEmpty)
+    }
+
     @Test func summaryLineIncludesKeyParams() {
         var r = Recipe(); r.waterTempC = 92; r.ratio = 15; r.pourCount = 4
         let line = r.summaryLine
