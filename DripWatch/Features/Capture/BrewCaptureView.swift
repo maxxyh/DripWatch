@@ -127,6 +127,16 @@ struct BrewCaptureView: View {
             .onChange(of: planNext) { _, _ in edited = true; persist() }
             .onChange(of: nextDraft) { _, _ in edited = true; persist() }
             .onChange(of: photoData) { _, _ in edited = true; persist() }
+            #if DEBUG
+            .task {
+                // DEBUG-only: jump straight into Brew mode for verification/screenshots.
+                guard UserDefaults.standard.bool(forKey: "openBrewingPhase"), !committed else { return }
+                if method == .pourover, recipe.doseGrams == nil { recipe.doseGrams = 20 }
+                try? await Task.sleep(for: .milliseconds(300))
+                commit()
+                withAnimation { phase = .brewing }
+            }
+            #endif
         }
     }
 
@@ -294,21 +304,10 @@ struct BrewCaptureView: View {
                 }
             }
 
-            if method == .pourover, !recipe.pours.isEmpty {
-                Divider().overlay(Theme.crema.opacity(0.3))
-                Text("Pour to (g)").overline()
-                ForEach($recipe.pours) { $pour in
-                    HStack {
-                        Text("#\(pour.order)").font(.param(.subheadline, weight: .bold))
-                            .foregroundStyle(Theme.accent).frame(width: 28)
-                        Spacer()
-                        TextField("—", value: $pour.toGrams, format: .number.precision(.fractionLength(0...0)))
-                            .keyboardType(.numberPad).multilineTextAlignment(.trailing)
-                            .font(.param(.title3, weight: .semibold)).frame(width: 72)
-                        Text("g").font(.subheadline).foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 2)
-                }
+            if method == .pourover {
+                pourPlan
+            } else {
+                espressoTechnique
             }
 
             if !bean.roasterNoteList.isEmpty {
@@ -336,8 +335,101 @@ struct BrewCaptureView: View {
             if let t = recipe.waterTempC { s.append(("temp", "\(t)°")) }
             if let d = recipe.doseGrams { s.append(("dose", "\(gramText(d))g")) }
             if let r = recipe.ratio { s.append(("ratio", "1:\(ratioText(r))")) }
+            // Total (finish) water — the number you actually pour to.
+            if let w = recipe.effectiveWaterGrams, recipe.doseGrams != nil {
+                s.append(("water", "\(gramText(w))g"))
+            }
         }
         return s
+    }
+
+    /// The pour-by-pour plan you follow while watching the scale: cumulative weight targets (and
+    /// timings when set). Uses your explicit breakdown if you made one — editable so a live
+    /// correction sticks — otherwise a suggested ramp derived from pour count + total water.
+    @ViewBuilder private var pourPlan: some View {
+        let derived = recipe.hasPourBreakdown ? [] : recipe.suggestedCumulativeTargets(count: recipe.pourCount ?? 0)
+        let hasLadder = recipe.hasPourBreakdown || !derived.isEmpty
+        if hasLadder || recipe.bloomTimeSec != nil || recipe.totalDrawdownSec != nil {
+            Divider().overlay(Theme.crema.opacity(0.3))
+            HStack(alignment: .firstTextBaseline) {
+                Text("Pour plan").overline()
+                Spacer()
+                if !pourPlanSummary.isEmpty {
+                    Text(pourPlanSummary).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if recipe.hasPourBreakdown {
+                ForEach($recipe.pours) { $pour in
+                    pourRow(order: pour.order, grams: $pour.toGrams, start: pour.startSec, end: pour.endSec)
+                }
+            } else {
+                ForEach(Array(derived.enumerated()), id: \.offset) { index, grams in
+                    staticPourRow(order: index + 1, grams: grams)
+                }
+            }
+        }
+    }
+
+    private var pourPlanSummary: String {
+        var parts: [String] = []
+        if let b = recipe.bloomTimeSec { parts.append("bloom \(timeText(b))") }
+        if let p = recipe.pourCount { parts.append("\(p) pour\(p == 1 ? "" : "s")") }
+        if let t = recipe.totalDrawdownSec { parts.append("TDD \(timeText(t))") }
+        return parts.joined(separator: " · ")
+    }
+
+    private func pourRow(order: Int, grams: Binding<Double?>, start: Int?, end: Int?) -> some View {
+        HStack(spacing: 10) {
+            Text("#\(order)").font(.param(.subheadline, weight: .bold))
+                .foregroundStyle(Theme.accent).frame(width: 28, alignment: .leading)
+            if let start {
+                Text(timeWindow(start, end)).font(.param(.caption)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text("→").foregroundStyle(.secondary)
+            TextField("—", value: grams, format: .number.precision(.fractionLength(0...0)))
+                .keyboardType(.numberPad).multilineTextAlignment(.trailing)
+                .font(.param(.title3, weight: .semibold)).frame(width: 66)
+            Text("g").font(.subheadline).foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func staticPourRow(order: Int, grams: Double) -> some View {
+        HStack(spacing: 10) {
+            Text("#\(order)").font(.param(.subheadline, weight: .bold))
+                .foregroundStyle(Theme.accent).frame(width: 28, alignment: .leading)
+            Spacer()
+            Text("→").foregroundStyle(.secondary)
+            Text(gramText(grams)).font(.param(.title3, weight: .semibold))
+            Text("g").font(.subheadline).foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func timeWindow(_ start: Int, _ end: Int?) -> String {
+        if let end { return "\(timeText(start))–\(timeText(end))" }
+        return timeText(start)
+    }
+
+    @ViewBuilder private var espressoTechnique: some View {
+        let tech: [(String, String)] = [
+            recipe.preInfusionSec.map { ("pre-infuse", "\($0)s") },
+            recipe.surfWaitSec.map { ("surf", "\($0)s") },
+            recipe.steamModeSec.map { ("steam", "\($0)s") },
+        ].compactMap { $0 }
+        if !tech.isEmpty {
+            Divider().overlay(Theme.crema.opacity(0.3))
+            Text("Manual technique").overline()
+            WrapLayout(spacing: 20, lineSpacing: 10) {
+                ForEach(tech, id: \.0) { item in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.1).font(.param(.title3, weight: .semibold))
+                        Text(item.0).font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
     }
 
     private var header: some View {

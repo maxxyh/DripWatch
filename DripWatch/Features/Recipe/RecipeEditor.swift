@@ -113,35 +113,40 @@ struct RecipeEditor: View {
 struct StepperCluster<Content: View>: View {
     let onMinus: () -> Void
     let onPlus: () -> Void
-    var minusDisabled = false
-    var plusDisabled = false
     @ViewBuilder var content: Content
 
     var body: some View {
         HStack(spacing: 0) {
-            button("minus", onMinus, minusDisabled)
+            button("minus", onMinus)
             divider
             content.frame(width: 74).frame(maxHeight: .infinity)
             divider
-            button("plus", onPlus, plusDisabled)
+            button("plus", onPlus)
         }
         .frame(height: 36)
         .background(Theme.crema.opacity(0.18))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.crema, lineWidth: 1))
+        .overlay(
+            // Decorative only — must never intercept taps meant for the buttons.
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Theme.crema, lineWidth: 1)
+                .allowsHitTesting(false)
+        )
     }
 
-    private var divider: some View { Rectangle().fill(Theme.crema).frame(width: 1, height: 22) }
+    private var divider: some View {
+        Rectangle().fill(Theme.crema).frame(width: 1, height: 22).allowsHitTesting(false)
+    }
 
-    private func button(_ shape: String, _ action: @escaping () -> Void, _ disabled: Bool) -> some View {
+    private func button(_ shape: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: shape)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(disabled ? Color.secondary.opacity(0.3) : Theme.accent)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 42, height: 36)
+                .contentShape(Rectangle())   // whole cell tappable, not just the glyph
         }
         .buttonStyle(.plain)
-        .disabled(disabled)
         .accessibilityLabel(shape == "plus" ? "Increase" : "Decrease")
     }
 }
@@ -165,8 +170,7 @@ private struct NumberField: View {
                 .font(.subheadline).foregroundStyle(.secondary)
             Spacer(minLength: 8)
             if step != nil {
-                StepperCluster(onMinus: { bump(-1) }, onPlus: { bump(1) },
-                               minusDisabled: atBound(-1), plusDisabled: atBound(1)) { valueField }
+                StepperCluster(onMinus: { bump(-1) }, onPlus: { bump(1) }) { valueField }
             } else {
                 valueField.frame(width: 90)
             }
@@ -198,11 +202,6 @@ private struct NumberField: View {
         guard let step else { return }
         Haptics.select()
         value = value == nil ? clamped(stepDefault) : clamped(value! + direction * step)
-    }
-
-    private func atBound(_ direction: Int) -> Bool {
-        guard let range, let v = value else { return false }
-        return direction > 0 ? v >= range.upperBound : v <= range.lowerBound
     }
 
     private func clamp() { if let v = value { value = clamped(v) } }

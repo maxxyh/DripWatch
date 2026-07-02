@@ -24,6 +24,10 @@ final class Bean: Syncable {
     var roasterNotes: String?
     var myFlavorTags: [String] = []
 
+    /// Set when the bag's used up. A finished bean drops off the top of the shelf into a separate
+    /// "Finished" section — kept for its history, not deleted.
+    var finishedAt: Date?
+
     /// Legacy single hero photo. Superseded by `photos` (multiple bag surfaces); kept so existing
     /// beans keep their shot, and folded into `photoDatas` as a fallback. Migrated into `photos`
     /// the next time the bean is edited.
@@ -78,6 +82,7 @@ final class Bean: Syncable {
 
     var brewCount: Int { timeline.count }
     var lastBrew: Brew? { timeline.first }
+    var isFinished: Bool { finishedAt != nil }
 
     /// A friendly label for the "brews together" chip.
     var togetherLabel: String {

@@ -122,10 +122,8 @@ struct GrindPicker: View {
     @ViewBuilder private var steppedEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
             grindRow(label: "Dial", value: grind?.majorText ?? "0",
-                     minusDisabled: (grind?.major ?? 0) <= 0, plusDisabled: (grind?.major ?? 0) >= 60,
                      onMinus: { adjustMajor(-1) }, onPlus: { adjustMajor(1) })
             grindRow(label: "Clicks", value: clicksText, hint: "+ finer · − coarser",
-                     minusDisabled: (grind?.clickOffset ?? 0) <= -30, plusDisabled: (grind?.clickOffset ?? 0) >= 30,
                      onMinus: { adjustClicks(-1) }, onPlus: { adjustClicks(1) })
             Button(role: .destructive) {
                 Haptics.tap(); grind = nil
@@ -152,14 +150,12 @@ struct GrindPicker: View {
     }
 
     private func grindRow(label: String, value: String, hint: String? = nil,
-                          minusDisabled: Bool, plusDisabled: Bool,
                           onMinus: @escaping () -> Void, onPlus: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
                 Text(label).font(.subheadline).foregroundStyle(.secondary)
                 Spacer(minLength: 8)
-                StepperCluster(onMinus: onMinus, onPlus: onPlus,
-                               minusDisabled: minusDisabled, plusDisabled: plusDisabled) {
+                StepperCluster(onMinus: onMinus, onPlus: onPlus) {
                     Text(value).font(.param(.body, weight: .semibold))
                 }
             }

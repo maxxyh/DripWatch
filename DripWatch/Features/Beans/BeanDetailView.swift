@@ -71,6 +71,10 @@ struct BeanDetailView: View {
                     Button { Haptics.tap(); editingBean = true } label: {
                         Label("Edit bean", systemImage: "pencil")
                     }
+                    Button { toggleFinished() } label: {
+                        Label(bean.isFinished ? "Reopen bean" : "Mark as finished",
+                              systemImage: bean.isFinished ? "arrow.uturn.backward" : "checkmark.seal")
+                    }
                     Button(role: .destructive) { confirmingDelete = true } label: {
                         Label("Delete bean", systemImage: "trash")
                     }
@@ -163,6 +167,13 @@ struct BeanDetailView: View {
         brew.deletedAt = .now
         brew.updatedAt = .now
         bean.updatedAt = .now
+    }
+
+    /// Mark the bag finished (or reopen it) — it moves to the shelf's Finished section, kept.
+    private func toggleFinished() {
+        bean.finishedAt = bean.isFinished ? nil : .now
+        bean.updatedAt = .now
+        Haptics.success()
     }
 
     private func deleteBean() {

@@ -10,6 +10,7 @@ struct BeanCardView: View {
     /// When set (detail header), tapping the bag photo opens the full-screen preview.
     var onTapPhoto: (() -> Void)? = nil
     @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var notesExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -29,7 +30,17 @@ struct BeanCardView: View {
 
     // MARK: Hero photo (or a warm placeholder when there's no bag shot yet)
 
-    private var photo: some View {
+    @ViewBuilder private var photo: some View {
+        // Only attach a tap gesture when there's a preview handler (detail). On the shelf there
+        // is none, so the tap falls through to the enclosing NavigationLink and opens the bean.
+        if onTapPhoto != nil, bean.primaryPhotoData != nil {
+            photoContent.onTapGesture { Haptics.tap(); onTapPhoto?() }
+        } else {
+            photoContent
+        }
+    }
+
+    private var photoContent: some View {
         ZStack {
             if let data = bean.primaryPhotoData, let ui = UIImage(data: data) {
                 Image(uiImage: ui)
@@ -48,10 +59,6 @@ struct BeanCardView: View {
         .frame(maxWidth: .infinity)
         .clipped()
         .contentShape(Rectangle())
-        .onTapGesture {
-            guard bean.primaryPhotoData != nil, let onTapPhoto else { return }
-            Haptics.tap(); onTapPhoto()
-        }
         .overlay(alignment: .topLeading) {
             // A hint that there's more than one bag surface to swipe through.
             if bean.photoDatas.count > 1 {
@@ -122,17 +129,39 @@ struct BeanCardView: View {
     }
 
     /// The roaster's tasting notes as accent chips (a highlight, distinct from origin facts and
-    /// the user's own tags). `limit` caps the shelf tile with a "+N" overflow chip.
+    /// the user's own tags). `limit` caps the shelf tile to N chips with a tappable "+N" that
+    /// expands the card to show the rest (and a "less" to collapse).
     @ViewBuilder private func roasterNoteChips(limit: Int? = nil) -> some View {
         let notes = bean.roasterNoteList
         if !notes.isEmpty {
-            let shown = limit.map { Array(notes.prefix($0)) } ?? notes
+            let collapsed = limit != nil && !notesExpanded
+            let shown = collapsed ? Array(notes.prefix(limit!)) : notes
             let extra = notes.count - shown.count
             WrapLayout(spacing: 6, lineSpacing: 6) {
-                ForEach(shown, id: \.self) { Chip(text: $0, symbol: "sparkles", tint: Theme.accent) }
-                if extra > 0 { Chip(text: "+\(extra)", tint: .secondary) }
+                ForEach(shown, id: \.self) {
+                    Chip(text: shelfText($0), symbol: "sparkles", tint: Theme.accent)
+                }
+                if extra > 0 {
+                    Button { Haptics.tap(); withAnimation { notesExpanded = true } } label: {
+                        Chip(text: "+\(extra)", tint: .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show \(extra) more tasting notes")
+                } else if notesExpanded, let limit, notes.count > limit {
+                    Button { Haptics.tap(); withAnimation { notesExpanded = false } } label: {
+                        Chip(text: "less", symbol: "chevron.up", tint: .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show fewer tasting notes")
+                }
             }
         }
+    }
+
+    /// Keep shelf chips from overflowing the narrow tile — truncate an over-long note.
+    private func shelfText(_ note: String) -> String {
+        guard style == .shelf, note.count > 18 else { return note }
+        return note.prefix(17).trimmingCharacters(in: .whitespaces) + "…"
     }
 
     @ViewBuilder private var factRows: some View {

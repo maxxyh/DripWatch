@@ -1,14 +1,12 @@
 import SwiftUI
 import SwiftData
 
-/// The shelf: a two-column grid of bean character cards. Primary entry point of the app.
+/// The shelf: a balanced two-column masonry of bean character cards. Primary entry point.
 struct BeanListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Bean.updatedAt, order: .reverse) private var beans: [Bean]
     @State private var addingBean = false
     @State private var path: [UUID] = []
-
-    private let columns = [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -19,12 +17,15 @@ struct BeanListView: View {
                     emptyState
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: columns, spacing: 14) {
-                            ForEach(activeBeans) { bean in
-                                NavigationLink(value: bean.id) {
-                                    BeanCardView(bean: bean, style: .shelf)
+                        VStack(alignment: .leading, spacing: 20) {
+                            masonry(shelfBeans)
+                            if !finishedBeans.isEmpty {
+                                HStack {
+                                    Text("Finished").font(.headline)
+                                    Spacer()
+                                    Text("\(finishedBeans.count)").font(.subheadline).foregroundStyle(.secondary)
                                 }
-                                .buttonStyle(.plain)
+                                masonry(finishedBeans).opacity(0.6)
                             }
                         }
                         .padding(Theme.Space.m)
@@ -86,6 +87,51 @@ struct BeanListView: View {
     }
 
     private var activeBeans: [Bean] { beans.filter { $0.deletedAt == nil } }
+    private var shelfBeans: [Bean] { activeBeans.filter { !$0.isFinished } }
+    private var finishedBeans: [Bean] { activeBeans.filter { $0.isFinished } }
+
+    // MARK: Masonry
+
+    /// Two columns, each bean greedily placed in the currently-shorter column (estimated from its
+    /// content) so cards pack tightly instead of leaving the ragged row gaps a grid would.
+    private func masonry(_ beans: [Bean]) -> some View {
+        let split = balancedColumns(beans)
+        return HStack(alignment: .top, spacing: 14) {
+            column(split.left)
+            column(split.right)
+        }
+    }
+
+    private func column(_ beans: [Bean]) -> some View {
+        VStack(spacing: 14) {
+            ForEach(beans) { bean in
+                NavigationLink(value: bean.id) {
+                    BeanCardView(bean: bean, style: .shelf)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
+    }
+
+    private func balancedColumns(_ beans: [Bean]) -> (left: [Bean], right: [Bean]) {
+        var left: [Bean] = [], right: [Bean] = []
+        var leftH: CGFloat = 0, rightH: CGFloat = 0
+        for bean in beans {
+            let h = estimatedHeight(bean)
+            if leftH <= rightH { left.append(bean); leftH += h } else { right.append(bean); rightH += h }
+        }
+        return (left, right)
+    }
+
+    /// A rough height estimate — only the *relative* order matters for balancing the columns.
+    private func estimatedHeight(_ bean: Bean) -> CGFloat {
+        var h: CGFloat = 128 + 24 + 22   // photo + padding + name
+        if bean.roasterName?.isEmpty == false { h += 16 }
+        if bean.process?.isEmpty == false || bean.country?.isEmpty == false { h += 16 }
+        h += CGFloat(min(bean.roasterNoteList.count, 3)) * 30
+        return h
+    }
 }
 
 #Preview {
