@@ -13,7 +13,10 @@ struct BeanSeedTests {
         let fresh = bean.seedRecipe(for: .pourover)
         #expect(fresh.waterTempC == 92)
         #expect(fresh.bloomTimeSec == 30)
-        #expect(fresh.totalDrawdownSec == 150)
+        #expect(fresh.ratio == 15)
+        #expect(fresh.pourCount == 3)
+        // Drawdown is intentionally left blank — a "see how it goes" number, not planned.
+        #expect(fresh.totalDrawdownSec == nil)
         #expect(bean.seedRecipe(for: .espresso).isEmpty)
 
         // A logged brew becomes the seed.

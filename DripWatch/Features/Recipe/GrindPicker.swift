@@ -117,19 +117,59 @@ struct GrindPicker: View {
         }
     }
 
-    /// Stepped: the notebook's dial + click offset.
+    /// Stepped: the notebook's dial + click offset, as two aligned stepper rows that match the
+    /// recipe fields (same `StepperCluster`), so the columns line up cleanly.
     @ViewBuilder private var steppedEditor: some View {
-        HStack(spacing: 14) {
-            stepper(label: "Dial",
-                    value: Binding(get: { Int(grind?.major ?? 0) }, set: { grind?.major = Double($0) }),
-                    range: 0...60,
-                    display: grind?.majorText ?? "0")
-            stepper(label: "Clicks",
-                    value: Binding(get: { grind?.clickOffset ?? 0 }, set: { grind?.clickOffset = $0 }),
-                    range: -30...30,
-                    display: grind.map { $0.clickOffset == 0 ? "0" : ($0.clickOffset > 0 ? "+\($0.clickOffset)" : "\($0.clickOffset)") } ?? "0",
-                    hint: "+ finer · − coarser")
-            clearButton
+        VStack(alignment: .leading, spacing: 10) {
+            grindRow(label: "Dial", value: grind?.majorText ?? "0",
+                     minusDisabled: (grind?.major ?? 0) <= 0, plusDisabled: (grind?.major ?? 0) >= 60,
+                     onMinus: { adjustMajor(-1) }, onPlus: { adjustMajor(1) })
+            grindRow(label: "Clicks", value: clicksText, hint: "+ finer · − coarser",
+                     minusDisabled: (grind?.clickOffset ?? 0) <= -30, plusDisabled: (grind?.clickOffset ?? 0) >= 30,
+                     onMinus: { adjustClicks(-1) }, onPlus: { adjustClicks(1) })
+            Button(role: .destructive) {
+                Haptics.tap(); grind = nil
+            } label: {
+                Label("Clear grind", systemImage: "xmark.circle")
+            }
+            .font(.subheadline).buttonStyle(.plain).foregroundStyle(.secondary)
+        }
+    }
+
+    private var clicksText: String {
+        guard let o = grind?.clickOffset, o != 0 else { return "0" }
+        return o > 0 ? "+\(o)" : "−\(abs(o))"
+    }
+
+    private func adjustMajor(_ direction: Int) {
+        Haptics.select()
+        grind?.major = min(max((grind?.major ?? 0) + Double(direction), 0), 60)
+    }
+
+    private func adjustClicks(_ direction: Int) {
+        Haptics.select()
+        grind?.clickOffset = min(max((grind?.clickOffset ?? 0) + direction, -30), 30)
+    }
+
+    private func grindRow(label: String, value: String, hint: String? = nil,
+                          minusDisabled: Bool, plusDisabled: Bool,
+                          onMinus: @escaping () -> Void, onPlus: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Text(label).font(.subheadline).foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                StepperCluster(onMinus: onMinus, onPlus: onPlus,
+                               minusDisabled: minusDisabled, plusDisabled: plusDisabled) {
+                    Text(value).font(.param(.body, weight: .semibold))
+                }
+            }
+            if let hint { Text(hint).font(.caption2).foregroundStyle(.tertiary) }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
+        .accessibilityAdjustableAction { direction in
+            if direction == .increment { onPlus() } else if direction == .decrement { onMinus() }
         }
     }
 
@@ -188,24 +228,4 @@ struct GrindPicker: View {
         context.insert(Grinder(name: name))
     }
 
-    private func stepper(label: String, value: Binding<Int>, range: ClosedRange<Int>, display: String, hint: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-            HStack(spacing: 8) {
-                Text(display)
-                    .font(.param(.title3, weight: .semibold))
-                    .frame(minWidth: 34, alignment: .leading)
-                Stepper("") {
-                    if value.wrappedValue < range.upperBound { value.wrappedValue += 1; Haptics.select() }
-                } onDecrement: {
-                    if value.wrappedValue > range.lowerBound { value.wrappedValue -= 1; Haptics.select() }
-                }
-                .labelsHidden()
-            }
-            if let hint { Text(hint).font(.caption2).foregroundStyle(.tertiary) }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(label)
-        .accessibilityValue(display)
-    }
 }

@@ -4,7 +4,9 @@ import SwiftUI
 /// next one. "Structured but mostly optional, progressive": the simple line is what you reach
 /// for every day; the per-pour breakdown and notes stay folded away until you want them.
 ///
-/// Numbers are typed directly (tap the value and enter it) — no +/- steppers to jab at.
+/// Values can be typed directly (tap and enter) or nudged with +/- where a small tweak is the
+/// common move (temp, pours, dose, the manual-technique seconds). Focusing a numeric field
+/// selects its contents so typing replaces rather than appends (see `selectAllWhenNumericFocused`).
 struct RecipeEditor: View {
     @Binding var recipe: Recipe
     var method: BrewMethod = .pourover
@@ -27,10 +29,10 @@ struct RecipeEditor: View {
     // MARK: Pourover
 
     @ViewBuilder private var pouroverFields: some View {
-        NumberField(label: "Temp", unit: "°C", value: $recipe.waterTempC, range: 60...100, systemImage: "thermometer.medium")
-        DecimalField(label: "Dose", unit: "g", value: $recipe.doseGrams, systemImage: "scalemass")
+        NumberField(label: "Temp", unit: "°C", value: $recipe.waterTempC, range: 60...100, systemImage: "thermometer.medium", step: 1, stepDefault: 92)
+        DecimalField(label: "Dose", unit: "g", value: $recipe.doseGrams, systemImage: "scalemass", step: 0.5, stepDefault: 15, range: 0...100, presets: [15, 20])
         RatioField(ratio: $recipe.ratio)
-        NumberField(label: "Pours", unit: "", value: $recipe.pourCount, range: 1...12, systemImage: "drop")
+        NumberField(label: "Pours", unit: "", value: $recipe.pourCount, range: 1...12, systemImage: "drop", step: 1, stepDefault: 3)
         TimeInputField(label: "Bloom", seconds: $recipe.bloomTimeSec, systemImage: "timer")
         TimeInputField(label: "Drawdown (TDD)", seconds: $recipe.totalDrawdownSec, systemImage: "hourglass")
 
@@ -59,8 +61,8 @@ struct RecipeEditor: View {
 
     @ViewBuilder private var espressoFields: some View {
         // Shot metrics.
-        DecimalField(label: "Dose", unit: "g", value: $recipe.doseGrams, systemImage: "scalemass")
-        DecimalField(label: "Yield", unit: "g", value: $recipe.yieldGrams, systemImage: "cup.and.saucer")
+        DecimalField(label: "Dose", unit: "g", value: $recipe.doseGrams, systemImage: "scalemass", step: 0.5, stepDefault: 18, range: 0...60, presets: [18, 20])
+        DecimalField(label: "Yield", unit: "g", value: $recipe.yieldGrams, systemImage: "cup.and.saucer", step: 0.5, stepDefault: 36, range: 0...120)
         if let ratio = recipe.shotRatio {
             HStack {
                 Label("Ratio", systemImage: "divide").font(.subheadline).foregroundStyle(.secondary)
@@ -76,14 +78,14 @@ struct RecipeEditor: View {
 
         // Manual technique — how temperature and pre-infusion are controlled without a PID.
         Text("Manual technique").overline().padding(.top, 4)
-        NumberField(label: "Pre-infusion", unit: "s", value: $recipe.preInfusionSec, range: 0...30, systemImage: "drop.circle")
-        NumberField(label: "Surf wait", unit: "s", value: $recipe.surfWaitSec, range: 0...90, systemImage: "clock")
-        NumberField(label: "Steam mode", unit: "s", value: $recipe.steamModeSec, range: 0...60, systemImage: "flame")
+        NumberField(label: "Pre-infusion", unit: "s", value: $recipe.preInfusionSec, range: 0...30, systemImage: "drop.circle", step: 1, stepDefault: 6)
+        NumberField(label: "Surf wait", unit: "s", value: $recipe.surfWaitSec, range: 0...90, systemImage: "clock", step: 1, stepDefault: 8)
+        NumberField(label: "Steam mode", unit: "s", value: $recipe.steamModeSec, range: 0...60, systemImage: "flame", step: 1, stepDefault: 4)
 
         // Advanced / future: a real °C reading (once a PID is fitted) plus free-text notes.
         DisclosureGroup(isExpanded: $showBreakdown) {
             VStack(alignment: .leading, spacing: 12) {
-                NumberField(label: "Temp", unit: "°C", value: $recipe.waterTempC, range: 80...110, systemImage: "thermometer.medium")
+                NumberField(label: "Temp", unit: "°C", value: $recipe.waterTempC, range: 80...110, systemImage: "thermometer.medium", step: 1, stepDefault: 93)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Notes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     TextField("channeling, gusher, updose…",
@@ -104,84 +106,227 @@ struct RecipeEditor: View {
 
 // MARK: - Field rows
 
-/// A typeable integer field with a label and unit. Tap the value and enter it directly; empty
-/// renders as a "—" placeholder. Out-of-range entries are clamped when you finish editing.
+/// A fixed-width `[−  value  +]` control. Every stepper row uses the same geometry, so the minus
+/// and plus glyphs line up in tidy columns down the form. Neutral pill + hairline border with
+/// accent glyphs — lighter than filled buttons. The value stays a tappable field for typing.
+/// Shared with the grind picker so all steppers in the app match.
+struct StepperCluster<Content: View>: View {
+    let onMinus: () -> Void
+    let onPlus: () -> Void
+    var minusDisabled = false
+    var plusDisabled = false
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: 0) {
+            button("minus", onMinus, minusDisabled)
+            divider
+            content.frame(width: 74).frame(maxHeight: .infinity)
+            divider
+            button("plus", onPlus, plusDisabled)
+        }
+        .frame(height: 36)
+        .background(Theme.crema.opacity(0.18))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.crema, lineWidth: 1))
+    }
+
+    private var divider: some View { Rectangle().fill(Theme.crema).frame(width: 1, height: 22) }
+
+    private func button(_ shape: String, _ action: @escaping () -> Void, _ disabled: Bool) -> some View {
+        Button(action: action) {
+            Image(systemName: shape)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(disabled ? Color.secondary.opacity(0.3) : Theme.accent)
+                .frame(width: 42, height: 36)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .accessibilityLabel(shape == "plus" ? "Increase" : "Decrease")
+    }
+}
+
+/// A typeable integer field. Tap the value and enter it directly; empty renders as "—". When
+/// `step` is set, an aligned +/- cluster nudges the value (a blank field jumps to `stepDefault`
+/// on first tap). Out-of-range entries are clamped.
 private struct NumberField: View {
     let label: String
     let unit: String
     @Binding var value: Int?
     var range: ClosedRange<Int>? = nil
     var systemImage: String
+    var step: Int? = nil
+    var stepDefault: Int = 0
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack {
+        HStack(spacing: 8) {
             Label(label, systemImage: systemImage)
                 .font(.subheadline).foregroundStyle(.secondary)
-            Spacer()
-            TextField("—", value: $value, format: .number)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.trailing)
-                .focused($focused)
-                .font(.param(.body, weight: .semibold))
-                .frame(maxWidth: 70)
-                .onChange(of: focused) { _, isFocused in
-                    if !isFocused { clamp() }
-                }
-            if !unit.isEmpty {
-                Text(unit).font(.subheadline).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            if step != nil {
+                StepperCluster(onMinus: { bump(-1) }, onPlus: { bump(1) },
+                               minusDisabled: atBound(-1), plusDisabled: atBound(1)) { valueField }
+            } else {
+                valueField.frame(width: 90)
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label)
         .accessibilityValue(value.map { "\($0) \(unit)" } ?? "not set")
+        .accessibilityAdjustableAction { direction in
+            guard step != nil else { return }
+            switch direction {
+            case .increment: bump(1)
+            case .decrement: bump(-1)
+            default: break
+            }
+        }
     }
 
-    private func clamp() {
-        guard let range, let v = value else { return }
-        value = min(max(v, range.lowerBound), range.upperBound)
+    private var valueField: some View {
+        HStack(spacing: 2) {
+            TextField("—", value: $value, format: .number)
+                .keyboardType(.numberPad).multilineTextAlignment(.center)
+                .focused($focused).font(.param(.body, weight: .semibold))
+                .onChange(of: focused) { _, isFocused in if !isFocused { clamp() } }
+            if !unit.isEmpty { Text(unit).font(.caption).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func bump(_ direction: Int) {
+        guard let step else { return }
+        Haptics.select()
+        value = value == nil ? clamped(stepDefault) : clamped(value! + direction * step)
+    }
+
+    private func atBound(_ direction: Int) -> Bool {
+        guard let range, let v = value else { return false }
+        return direction > 0 ? v >= range.upperBound : v <= range.lowerBound
+    }
+
+    private func clamp() { if let v = value { value = clamped(v) } }
+    private func clamped(_ v: Int) -> Int {
+        guard let range else { return v }
+        return min(max(v, range.lowerBound), range.upperBound)
     }
 }
 
-/// A decimal field (dose) with a numeric keyboard.
+/// A decimal field (dose, yield). Optional +/- nudge by `step` (e.g. 0.5 g), snapping to the grid;
+/// a blank field jumps to `stepDefault` on first tap. `presets` adds quick-pick chips (e.g. your
+/// two usual doses, 15 g / 20 g) beneath the field — tap to fill, tap again to clear, type to override.
 private struct DecimalField: View {
     let label: String
     let unit: String
     @Binding var value: Double?
     var systemImage: String
+    var step: Double? = nil
+    var stepDefault: Double = 0
+    var range: ClosedRange<Double>? = nil
+    var presets: [Double] = []
 
     var body: some View {
-        HStack {
-            Label(label, systemImage: systemImage)
-                .font(.subheadline).foregroundStyle(.secondary)
-            Spacer()
-            TextField("—", value: $value, format: .number.precision(.fractionLength(0...1)))
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .font(.param(.body, weight: .semibold))
-                .frame(maxWidth: 90)
-            Text(unit).font(.subheadline).foregroundStyle(.secondary)
+        VStack(alignment: .trailing, spacing: 6) {
+            HStack(spacing: 8) {
+                Label(label, systemImage: systemImage)
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                if step != nil {
+                    StepperCluster(onMinus: { bump(-1) }, onPlus: { bump(1) }) { valueField }
+                } else {
+                    valueField.frame(width: 90)
+                }
+            }
+            if !presets.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(presets, id: \.self) { presetChip($0) }
+                }
+            }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+        .accessibilityValue(value.map { "\(gramText($0)) \(unit)" } ?? "not set")
+        .accessibilityAdjustableAction { direction in
+            guard step != nil else { return }
+            switch direction {
+            case .increment: bump(1)
+            case .decrement: bump(-1)
+            default: break
+            }
+        }
+    }
+
+    private var valueField: some View {
+        HStack(spacing: 2) {
+            TextField("—", value: $value, format: .number.precision(.fractionLength(0...1)))
+                .keyboardType(.decimalPad).multilineTextAlignment(.center)
+                .font(.param(.body, weight: .semibold))
+            if !unit.isEmpty { Text(unit).font(.caption).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func presetChip(_ preset: Double) -> some View {
+        let active = value == preset
+        return Button {
+            Haptics.select()
+            value = active ? nil : preset
+        } label: {
+            Chip(text: "\(gramText(preset))\(unit)", symbol: active ? "checkmark" : nil,
+                 tint: active ? Theme.accent : .secondary)
+                .hitTarget(32)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(gramText(preset)) \(unit)\(active ? ", selected" : "")")
+    }
+
+    private func bump(_ direction: Int) {
+        guard let step else { return }
+        Haptics.select()
+        let raw = value == nil ? stepDefault : value! + Double(direction) * step
+        let snapped = (raw / step).rounded() * step
+        if let range { value = min(max(snapped, range.lowerBound), range.upperBound) }
+        else { value = max(0, snapped) }
     }
 }
 
-/// Ratio entered as the denominator: "1 : [15]".
+/// Ratio entered as the denominator: "1 : [15]", with +/- in 0.5 steps.
 private struct RatioField: View {
     @Binding var ratio: Double?
+    var step: Double = 0.5
+    var stepDefault: Double = 15
+    var range: ClosedRange<Double> = 1...30
+
     var body: some View {
-        HStack {
+        HStack(spacing: 8) {
             Label("Ratio", systemImage: "divide").font(.subheadline).foregroundStyle(.secondary)
-            Spacer()
-            Text("1 :").font(.body.weight(.semibold))
-            TextField("—", value: $ratio, format: .number.precision(.fractionLength(0...1)))
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .font(.param(.body, weight: .semibold))
-                .frame(maxWidth: 60)
+            Spacer(minLength: 8)
+            StepperCluster(onMinus: { bump(-1) }, onPlus: { bump(1) }) {
+                HStack(spacing: 1) {
+                    Text("1:").font(.param(.body, weight: .semibold)).foregroundStyle(.secondary)
+                    TextField("—", value: $ratio, format: .number.precision(.fractionLength(0...1)))
+                        .keyboardType(.decimalPad).multilineTextAlignment(.leading)
+                        .font(.param(.body, weight: .semibold))
+                        .frame(width: 30)
+                }
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Ratio")
         .accessibilityValue(ratio.map { "1 to \(ratioText($0))" } ?? "not set")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: bump(1)
+            case .decrement: bump(-1)
+            default: break
+            }
+        }
+    }
+
+    private func bump(_ direction: Int) {
+        Haptics.select()
+        let raw = ratio == nil ? stepDefault : ratio! + Double(direction) * step
+        let snapped = (raw / step).rounded() * step
+        ratio = min(max(snapped, range.lowerBound), range.upperBound)
     }
 }
 
@@ -236,12 +381,22 @@ private func parseTime(_ raw: String) -> Int? {
 }
 
 /// Editable per-pour list, driven by the pour *count* so you don't add rows one-by-one: set
-/// "Pours" to 4 and four rows appear, pre-filled with suggested cumulative weights. Each row
-/// carries a pour window (start–end), a cumulative target, and a style/note. Times cascade:
-/// typing a start fills its end, typing an end fills the next pour's start (only ever filling
-/// blanks, never overwriting what you typed).
+/// "Pours" to 4 and four rows appear. Cumulative water targets are suggested and **re-flow to a
+/// clean ramp whenever you change the count** (add/remove a pour), so you never end up with a
+/// stale middle and an empty last row. A seeded recipe's existing weights are preserved on load.
+/// Timings are off by default — reveal them only when you actually have a schedule to follow, so
+/// the app never invents times you'd have to delete.
 private struct PourBreakdown: View {
     @Binding var recipe: Recipe
+    @State private var syncedCount: Int?
+    @State private var showTimes: Bool
+
+    init(recipe: Binding<Recipe>) {
+        _recipe = recipe
+        // Show the time columns up front only if the recipe already carries timings.
+        let hasTimes = recipe.wrappedValue.pours.contains { $0.startSec != nil || $0.endSec != nil }
+        _showTimes = State(initialValue: hasTimes)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -249,21 +404,24 @@ private struct PourBreakdown: View {
                 Text("Set a pour count above to lay out the pours, or add one below.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
+                Toggle(isOn: $showTimes.animation()) {
+                    Text("Add pour timings").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                }
+                .tint(Theme.accent)
                 HStack {
                     Text("#").frame(width: 24)
-                    Text("start – end")
+                    if showTimes { Text("start – end") }
                     Spacer()
-                    Text("to")
+                    Text("to (g)")
                 }
                 .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
             }
             ForEach($recipe.pours) { $pour in
-                PourRow(pour: $pour) { remove(pour) }
+                PourRow(pour: $pour, showTimes: showTimes) { remove(pour) }
             }
             Button {
                 Haptics.tap()
-                recipe.pours.append(Pour(order: recipe.pours.count + 1))
-                recipe.pourCount = recipe.pours.count
+                recipe.pourCount = (recipe.pourCount ?? recipe.pours.count) + 1
             } label: {
                 Label("Add pour", systemImage: "plus.circle")
             }
@@ -271,11 +429,11 @@ private struct PourBreakdown: View {
         }
         .onAppear { syncToCount() }
         .onChange(of: recipe.pourCount) { _, _ in syncToCount() }
-        .onChange(of: recipe.pours) { _, _ in normalizeTimes() }
     }
 
-    /// Make the number of rows match `pourCount`, pre-fill suggested weights when the rows are
-    /// still blank, and seed the first pour's start at 0:00.
+    /// Match the row count to `pourCount`, then decide on weights: on first layout keep whatever
+    /// a seeded recipe brought (only suggest into a fully-blank set); on any later count change,
+    /// re-flow the whole cumulative ramp so add/remove always leaves a sensible, complete set.
     private func syncToCount() {
         guard let target = recipe.pourCount, target >= 0 else { return }
         if recipe.pours.count < target {
@@ -284,32 +442,19 @@ private struct PourBreakdown: View {
             recipe.pours = Array(recipe.pours.prefix(target))
         }
         reorder()
-        prefillWeights()
-        if !recipe.pours.isEmpty, recipe.pours[0].startSec == nil { recipe.pours[0].startSec = 0 }
-        normalizeTimes()
+
+        if syncedCount == nil {
+            if recipe.pours.allSatisfy({ $0.toGrams == nil }) { applySuggestedWeights() }
+        } else if target != syncedCount {
+            applySuggestedWeights()
+        }
+        syncedCount = target
     }
 
-    /// Suggest cumulative water targets, but only when nothing's been entered yet.
-    private func prefillWeights() {
-        guard recipe.pours.allSatisfy({ $0.toGrams == nil }) else { return }
+    private func applySuggestedWeights() {
         let targets = recipe.suggestedCumulativeTargets(count: recipe.pours.count)
         guard targets.count == recipe.pours.count else { return }
         for i in recipe.pours.indices { recipe.pours[i].toGrams = targets[i] }
-    }
-
-    /// "Fill one, populate the next", filling blanks only: a start suggests its end (+10s); an
-    /// end suggests the next pour's start (after the bloom rest for pour 1, a short rest after).
-    private func normalizeTimes() {
-        var p = recipe.pours
-        var changed = false
-        for i in p.indices where p[i].startSec != nil && p[i].endSec == nil {
-            p[i].endSec = p[i].startSec! + 10; changed = true
-        }
-        for i in p.indices.dropLast() where p[i].endSec != nil && p[i + 1].startSec == nil {
-            let rest = (i == 0) ? (recipe.bloomTimeSec ?? 30) : 30
-            p[i + 1].startSec = p[i].endSec! + rest; changed = true
-        }
-        if changed { recipe.pours = p }   // guarded, so it converges in one extra pass
     }
 
     private func remove(_ pour: Pour) {
@@ -324,18 +469,22 @@ private struct PourBreakdown: View {
     }
 }
 
-/// One editable pour: time window + cumulative target on the first line, style/note below.
+/// One editable pour: cumulative target (+ optional time window) on the first line, style/note
+/// below. Time cells appear only when the breakdown's "Add pour timings" toggle is on.
 private struct PourRow: View {
     @Binding var pour: Pour
+    var showTimes: Bool
     var onRemove: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text("#\(pour.order)").font(.caption.weight(.bold)).foregroundStyle(Theme.accent).frame(width: 24)
-                PourTimeField(placeholder: "0:00", seconds: $pour.startSec)
-                Text("–").font(.caption).foregroundStyle(.secondary)
-                PourTimeField(placeholder: "end", seconds: $pour.endSec)
+                if showTimes {
+                    PourTimeField(placeholder: "start", seconds: $pour.startSec)
+                    Text("–").font(.caption).foregroundStyle(.secondary)
+                    PourTimeField(placeholder: "end", seconds: $pour.endSec)
+                }
                 Spacer(minLength: 4)
                 TextField("g", value: $pour.toGrams, format: .number.precision(.fractionLength(0...0)))
                     .keyboardType(.numberPad).multilineTextAlignment(.trailing)

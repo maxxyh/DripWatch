@@ -82,6 +82,22 @@ extension View {
             .foregroundStyle(.secondary)
             .textCase(.uppercase)
     }
+
+    /// When a numeric-keyboard text field within this view begins editing, select its whole
+    /// contents so typing *replaces* the value instead of appending — no backspacing to clear a
+    /// seeded number. Attach once per screen; it applies to every numeric field inside. Prose
+    /// fields (default keyboard) are left alone.
+    func selectAllWhenNumericFocused() -> some View {
+        onReceive(NotificationCenter.default.publisher(for: UITextField.textDidBeginEditingNotification)) { note in
+            guard let field = note.object as? UITextField else { return }
+            switch field.keyboardType {
+            case .numberPad, .decimalPad, .numbersAndPunctuation:
+                DispatchQueue.main.async { field.selectAll(nil) }
+            default:
+                break
+            }
+        }
+    }
 }
 
 extension Font {

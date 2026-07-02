@@ -56,13 +56,15 @@ struct Recipe: Codable, Hashable {
 
     init() {}
 
-    /// A sensible starting point for a fresh pourover — the values you'd otherwise re-type
-    /// every single brew. All still editable; this is just where the dials begin.
+    /// A sensible starting point for a fresh pourover — the values you'd otherwise re-type every
+    /// brew (92°, 30s bloom, 1:15, 3 pours). Dose is left blank (it varies by cup) and drawdown
+    /// too — that's a "see how it goes" number, not something to plan up front. All still editable.
     static func newPourover() -> Recipe {
         var r = Recipe()
         r.waterTempC = 92
         r.bloomTimeSec = 30
-        r.totalDrawdownSec = 150   // ~2:30 total drawdown
+        r.ratio = 15
+        r.pourCount = 3
         return r
     }
 
