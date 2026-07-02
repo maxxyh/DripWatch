@@ -71,8 +71,20 @@ final class Bean: Syncable {
     }
 
     /// The recipe to start the next brew from: the pending draft for that method, else the last
-    /// brew of that method, else empty.
+    /// brew of that method, else a method-appropriate default (pourover gets sensible dials so
+    /// you're not typing temp/bloom/drawdown from zero every time).
     func seedRecipe(for method: BrewMethod) -> Recipe {
-        pendingNextRecipe(for: method) ?? lastBrew(for: method)?.recipe ?? Recipe()
+        if let pending = pendingNextRecipe(for: method) { return pending }
+        if let last = lastBrew(for: method)?.recipe { return last }
+        return method == .pourover ? .newPourover() : Recipe()
+    }
+
+    /// Whole days elapsed since the roast date (0 = roasted today). Nil when no roast date.
+    var daysSinceRoast: Int? {
+        guard let roastDate else { return nil }
+        let cal = Calendar.current
+        return cal.dateComponents([.day],
+                                  from: cal.startOfDay(for: roastDate),
+                                  to: cal.startOfDay(for: .now)).day
     }
 }

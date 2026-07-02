@@ -10,23 +10,38 @@ struct BrewCaptureView: View {
 
     let bean: Bean
     let method: BrewMethod
+    /// When set, we're editing this existing brew rather than logging a new one.
+    let editingBrew: Brew?
 
     @State private var brewedAt = Date.now
     @State private var recipe: Recipe
-    @State private var taste = Taste()
+    @State private var taste: Taste
     @State private var showBalance = false
     @State private var planNext: Bool
     @State private var nextDraft: Recipe
 
-    init(bean: Bean, method: BrewMethod = .pourover) {
+    init(bean: Bean, method: BrewMethod = .pourover, editing: Brew? = nil) {
         self.bean = bean
-        self.method = method
-        // Seed only from a previous brew of the SAME method (espresso and pourover recipes differ).
-        let seed = bean.seedRecipe(for: method)
-        _recipe = State(initialValue: seed)
-        let pending = bean.pendingNextRecipe(for: method)
-        _planNext = State(initialValue: pending != nil)
-        _nextDraft = State(initialValue: pending ?? seed)
+        self.method = editing?.method ?? method
+        self.editingBrew = editing
+
+        if let editing {
+            // Editing: load exactly what was saved so nothing changes unless the user changes it.
+            _brewedAt = State(initialValue: editing.brewedAt)
+            _recipe = State(initialValue: editing.recipe)
+            _taste = State(initialValue: editing.taste)
+            _planNext = State(initialValue: editing.nextRecipeDraft != nil)
+            _nextDraft = State(initialValue: editing.nextRecipeDraft ?? editing.recipe)
+        } else {
+            // New brew: seed only from a previous brew of the SAME method (recipes differ by method).
+            let seed = bean.seedRecipe(for: editing?.method ?? method)
+            _brewedAt = State(initialValue: .now)
+            _recipe = State(initialValue: seed)
+            _taste = State(initialValue: Taste())
+            let pending = bean.pendingNextRecipe(for: editing?.method ?? method)
+            _planNext = State(initialValue: pending != nil)
+            _nextDraft = State(initialValue: pending ?? seed)
+        }
     }
 
     var body: some View {
@@ -41,7 +56,7 @@ struct BrewCaptureView: View {
                 .padding(Theme.Space.m)
             }
             .background(Theme.canvas.ignoresSafeArea())
-            .navigationTitle("New \(method.label)")
+            .navigationTitle("\(editingBrew == nil ? "New" : "Edit") \(method.label)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -84,9 +99,9 @@ struct BrewCaptureView: View {
         VStack(alignment: .leading, spacing: 14) {
             sectionTitle("How did it taste?", systemImage: "mouth")
 
-            // The everyday taste input: what was good, what was off.
+            // The everyday taste input: what was good, what was bad.
             ChipField(title: "Good", items: $taste.positives, tint: Theme.sage, symbol: "plus")
-            ChipField(title: "Off", items: $taste.negatives, tint: Theme.clay, symbol: "minus")
+            ChipField(title: "Bad", items: $taste.negatives, tint: Theme.clay, symbol: "minus")
 
             // A free-text impression for nuance the chips can't hold — one tap away.
             DisclosureGroup(isExpanded: $showBalance) {
@@ -144,14 +159,26 @@ struct BrewCaptureView: View {
     }
 
     private func save() {
-        let brew = Brew(brewedAt: brewedAt, method: method, recipe: recipe)
+        let brew: Brew
+        if let editingBrew {
+            brew = editingBrew
+            brew.brewedAt = brewedAt
+            brew.method = method
+            brew.recipe = recipe
+            brew.updatedAt = .now
+        } else {
+            brew = Brew(brewedAt: brewedAt, method: method, recipe: recipe)
+            brew.bean = bean
+            context.insert(brew)
+        }
         brew.taste = taste
         brew.nextRecipeDraft = planNext ? nextDraft : nil
-        brew.bean = bean
-        context.insert(brew)
 
-        // The plan becomes the bean's pending seed for next time, keyed by method.
-        bean.setPendingNextRecipe(planNext ? nextDraft : nil, for: method)
+        // The plan becomes the bean's pending seed for next time — but only if this is the
+        // newest brew of its method (editing an older brew shouldn't clobber the current plan).
+        if bean.lastBrew(for: method)?.id == brew.id {
+            bean.setPendingNextRecipe(planNext ? nextDraft : nil, for: method)
+        }
         bean.updatedAt = .now
 
         Haptics.success()
@@ -169,6 +196,7 @@ struct ChipField: View {
     var tint: Color
     var symbol: String
     @State private var entry = ""
+    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -192,7 +220,11 @@ struct ChipField: View {
                 TextField("Add \(title.lowercased())…", text: $entry)
                     .textInputAutocapitalization(.never)
                     .font(.subheadline)
+                    .focused($focused)
                     .onSubmit(add)
+                    // Commit whatever's typed when the field loses focus (e.g. tapping Save),
+                    // so a note you typed but didn't "enter" isn't silently lost.
+                    .onChange(of: focused) { _, isFocused in if !isFocused { add() } }
                 Button(action: add) { Image(systemName: "return").hitTarget(36) }
                     .buttonStyle(.plain).foregroundStyle(Theme.accent)
                     .disabled(entry.nilIfBlank == nil)

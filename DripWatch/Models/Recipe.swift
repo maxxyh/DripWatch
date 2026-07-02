@@ -1,19 +1,24 @@
 import Foundation
 
 /// One pour in a pourover, as it appears in the notebook — a cumulative water target
-/// (`toGrams`), an optional time, and an optional style note ("centre", "aggressive").
-/// This is the *advanced* layer: recipes work fine with just a pour count and no breakdown.
+/// (`toGrams`), the window it was poured over (`startSec`…`endSec`), and an optional style note
+/// ("centre", "aggressive"). This is the *advanced* layer: recipes work fine with just a pour
+/// count and no breakdown.
 struct Pour: Codable, Hashable, Identifiable {
     var id: UUID = UUID()
     var order: Int
     var toGrams: Double?
-    var atTimeSec: Int?
+    /// When this pour began, in seconds from brew start.
+    var startSec: Int?
+    /// When this pour finished (start of the drawdown before the next pour).
+    var endSec: Int?
     var style: String?
 
-    init(order: Int, toGrams: Double? = nil, atTimeSec: Int? = nil, style: String? = nil) {
+    init(order: Int, toGrams: Double? = nil, startSec: Int? = nil, endSec: Int? = nil, style: String? = nil) {
         self.order = order
         self.toGrams = toGrams
-        self.atTimeSec = atTimeSec
+        self.startSec = startSec
+        self.endSec = endSec
         self.style = style
     }
 }
@@ -51,6 +56,16 @@ struct Recipe: Codable, Hashable {
 
     init() {}
 
+    /// A sensible starting point for a fresh pourover — the values you'd otherwise re-type
+    /// every single brew. All still editable; this is just where the dials begin.
+    static func newPourover() -> Recipe {
+        var r = Recipe()
+        r.waterTempC = 92
+        r.bloomTimeSec = 30
+        r.totalDrawdownSec = 150   // ~2:30 total drawdown
+        return r
+    }
+
     /// Brew ratio for espresso (yield ÷ dose), e.g. 2.0 for a 1:2 shot.
     var shotRatio: Double? {
         guard let d = doseGrams, d > 0, let y = yieldGrams else { return nil }
@@ -64,9 +79,30 @@ struct Recipe: Codable, Hashable {
         return nil
     }
 
+    /// Suggested cumulative water targets for `count` pours, used to pre-fill the breakdown so
+    /// you're not doing arithmetic mid-brew. When a dose is known, the bloom (pour 1) gets ~3×
+    /// dose and the rest is split evenly to the total; otherwise it's a plain even split. The
+    /// last target always lands exactly on the total. Empty when there's no total to work from.
+    func suggestedCumulativeTargets(count: Int) -> [Double] {
+        guard count > 0, let total = effectiveWaterGrams, total > 0 else { return [] }
+        func r5(_ x: Double) -> Double { max(0, (x / 5).rounded() * 5) }
+
+        var targets: [Double]
+        if count >= 2, let dose = doseGrams, dose > 0, r5(dose * 3) < total {
+            let bloom = r5(dose * 3)
+            let step = (total - bloom) / Double(count - 1)
+            targets = (0..<count).map { i in i == 0 ? bloom : bloom + step * Double(i) }
+        } else {
+            targets = (1...count).map { total * Double($0) / Double(count) }
+        }
+        targets = targets.map(r5)
+        targets[count - 1] = r5(total)   // land exactly on the total
+        return targets
+    }
+
     /// Pours that actually carry data (a blank "Add pour" row doesn't count).
     var meaningfulPours: [Pour] {
-        pours.filter { $0.toGrams != nil || $0.atTimeSec != nil || ($0.style?.isEmpty == false) }
+        pours.filter { $0.toGrams != nil || $0.startSec != nil || $0.endSec != nil || ($0.style?.isEmpty == false) }
     }
 
     /// True when the per-pour breakdown has real content — drives progressive disclosure.

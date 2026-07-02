@@ -9,6 +9,8 @@ struct BeanDetailView: View {
     @Bindable var bean: Bean
 
     @State private var captureMethod: BrewMethod?
+    @State private var editingBrew: Brew?
+    @State private var editingBean = false
     @State private var confirmingDelete = false
 
     var body: some View {
@@ -36,7 +38,7 @@ struct BeanDetailView: View {
                     }
                     .padding(.top, 4)
                     .id("history")
-                    BrewHistoryView(brews: bean.timeline, onDelete: delete)
+                    BrewHistoryView(brews: bean.timeline, onEdit: { editingBrew = $0 }, onDelete: delete)
                 }
             }
             .padding(Theme.Space.m)
@@ -60,6 +62,9 @@ struct BeanDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    Button { Haptics.tap(); editingBean = true } label: {
+                        Label("Edit bean", systemImage: "pencil")
+                    }
                     Button(role: .destructive) { confirmingDelete = true } label: {
                         Label("Delete bean", systemImage: "trash")
                     }
@@ -71,6 +76,12 @@ struct BeanDetailView: View {
         }
         .sheet(item: $captureMethod) { method in
             BrewCaptureView(bean: bean, method: method)
+        }
+        .sheet(item: $editingBrew) { brew in
+            BrewCaptureView(bean: bean, editing: brew)
+        }
+        .sheet(isPresented: $editingBean) {
+            AddBeanView(editing: bean)
         }
         .confirmationDialog("Delete this bean and all its brews?",
                             isPresented: $confirmingDelete, titleVisibility: .visible) {

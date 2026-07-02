@@ -1,11 +1,24 @@
 import SwiftUI
+import SwiftData
 
 /// Picks a grind in the grinder's *own* absolute vocabulary — grinder name, major dial, and
 /// ± click offset — always showing the full reproducible value (`1Zpresso J · 3(−1)`).
-/// Remembers the last grinder used so repeat capture is one glance.
+/// Grinders you've used are saved, so picking one again is a single tap (we only own a few).
 struct GrindPicker: View {
     @Binding var grind: GrindSetting?
+
+    @Environment(\.modelContext) private var context
+    @Query(sort: \Grinder.name) private var grinders: [Grinder]
     @AppStorage("lastGrinderName") private var lastGrinder = "1Zpresso J"
+
+    /// Saved, non-deleted grinder names (deduped), newest-known first-ish by name sort.
+    private var savedNames: [String] {
+        var seen = Set<String>()
+        return grinders
+            .filter { $0.deletedAt == nil && !$0.name.isEmpty }
+            .map(\.name)
+            .filter { seen.insert($0).inserted }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -21,10 +34,31 @@ struct GrindPicker: View {
                 }
             }
 
+            // Saved grinders — tap to select / switch. Always available so a wrong pick is one tap to fix.
+            if !savedNames.isEmpty {
+                WrapLayout(spacing: 6, lineSpacing: 6) {
+                    ForEach(savedNames, id: \.self) { name in
+                        Button {
+                            Haptics.select()
+                            selectGrinder(name)
+                        } label: {
+                            Chip(text: name,
+                                 symbol: grind?.grinderName == name ? "checkmark" : nil,
+                                 tint: grind?.grinderName == name ? Theme.accent : .secondary)
+                                .hitTarget(36)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Grinder \(name)\(grind?.grinderName == name ? ", selected" : "")")
+                    }
+                }
+            }
+
             if grind == nil {
                 Button {
                     Haptics.tap()
-                    grind = GrindSetting(grinderName: lastGrinder, major: 3, clickOffset: 0)
+                    let name = savedNames.first ?? lastGrinder
+                    grind = GrindSetting(grinderName: name, major: 3, clickOffset: 0)
+                    saveGrinder(name)
                 } label: {
                     Label("Set grind", systemImage: "plus.circle.fill")
                 }
@@ -34,15 +68,20 @@ struct GrindPicker: View {
                 editor
             }
         }
+        // Backfill: any grinder we're already using should be remembered as a tappable chip,
+        // even if the user never edits the name field this session.
+        .onAppear { if let name = grind?.grinderName { saveGrinder(name) } }
     }
 
     @ViewBuilder private var editor: some View {
-        // Grinder name (remembered for next time).
+        // Grinder name (free text for a new grinder; also remembered + saved for next time).
         TextField("Grinder", text: Binding(
             get: { grind?.grinderName ?? "" },
             set: { grind?.grinderName = $0; lastGrinder = $0 }
         ))
         .textInputAutocapitalization(.words)
+        .submitLabel(.done)
+        .onSubmit { if let name = grind?.grinderName { saveGrinder(name) } }
         .font(.subheadline)
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
@@ -69,6 +108,25 @@ struct GrindPicker: View {
             .foregroundStyle(.secondary)
             .accessibilityLabel("Clear grind")
         }
+    }
+
+    /// Select a saved grinder, keeping the current dial/clicks (just swapping the machine).
+    private func selectGrinder(_ name: String) {
+        if grind == nil {
+            grind = GrindSetting(grinderName: name, major: 3, clickOffset: 0)
+        } else {
+            grind?.grinderName = name
+        }
+        lastGrinder = name
+        saveGrinder(name)
+    }
+
+    /// Upsert a grinder by name so it appears as a tappable chip next time.
+    private func saveGrinder(_ rawName: String) {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        guard !grinders.contains(where: { $0.deletedAt == nil && $0.name == name }) else { return }
+        context.insert(Grinder(name: name))
     }
 
     private func stepper(label: String, value: Binding<Int>, range: ClosedRange<Int>, display: String, hint: String? = nil) -> some View {

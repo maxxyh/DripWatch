@@ -8,8 +8,13 @@ struct BeanSeedTests {
     @Test func seedFallsBackToLastBrewThenPending() {
         let bean = Bean(name: "Test")
 
-        // Nothing yet → empty seed.
-        #expect(bean.seedRecipe(for: .pourover).isEmpty)
+        // Nothing yet → a fresh pourover starts from sensible defaults (not blank), while
+        // espresso still starts empty.
+        let fresh = bean.seedRecipe(for: .pourover)
+        #expect(fresh.waterTempC == 92)
+        #expect(fresh.bloomTimeSec == 30)
+        #expect(fresh.totalDrawdownSec == 150)
+        #expect(bean.seedRecipe(for: .espresso).isEmpty)
 
         // A logged brew becomes the seed.
         var r = Recipe(); r.waterTempC = 90
@@ -32,7 +37,8 @@ struct BeanSeedTests {
 
         #expect(bean.pendingNextRecipe(for: .espresso)?.yieldGrams == 40)
         #expect(bean.pendingNextRecipe(for: .pourover) == nil)
-        #expect(bean.seedRecipe(for: .pourover).isEmpty)
+        // No pourover pending/last → pourover falls back to its defaults (temp seeded).
+        #expect(bean.seedRecipe(for: .pourover).waterTempC == 92)
     }
 
     @Test func softDeletedBrewsAreExcludedFromTimeline() {

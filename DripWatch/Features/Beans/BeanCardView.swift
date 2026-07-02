@@ -102,8 +102,22 @@ struct BeanCardView: View {
             fact("VARIETY", bean.varietal)
             fact("PROCESS", bean.process)
             fact("ROAST", bean.roastLevel)
-            if let d = bean.roastDate { fact("ROASTED", d.formatted(date: .abbreviated, time: .omitted)) }
+            if let d = bean.roastDate { fact("ROASTED", roastedText(d)) }
         }
+    }
+
+    /// e.g. "12 Jun · 20 days ago" — the age is what actually matters day-to-day.
+    private func roastedText(_ date: Date) -> String {
+        let base = date.formatted(date: .abbreviated, time: .omitted)
+        guard let days = bean.daysSinceRoast else { return base }
+        let age: String
+        switch days {
+        case ..<0: age = "future date"
+        case 0: age = "today"
+        case 1: age = "1 day ago"
+        default: age = "\(days) days ago"
+        }
+        return "\(base) · \(age)"
     }
 
     @ViewBuilder private func fact(_ label: String, _ value: String?) -> some View {
