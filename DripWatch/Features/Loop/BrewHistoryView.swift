@@ -18,6 +18,7 @@ struct BrewHistoryView: View {
                 BrewRow(brew: brew, previous: previous, onEdit: { onEdit(brew) }, onDelete: { onDelete(brew) }, onTapPhoto: onTapPhoto)
                     .contextMenu {
                         Button { onEdit(brew) } label: { Label("Edit brew", systemImage: "pencil") }
+                        Button { copyBrew(brew) } label: { Label("Copy as text", systemImage: "doc.on.doc") }
                         Button(role: .destructive) { onDelete(brew) } label: {
                             Label("Delete brew", systemImage: "trash")
                         }
@@ -25,6 +26,12 @@ struct BrewHistoryView: View {
             }
         }
     }
+}
+
+/// Copy a brew's full details to the clipboard as Markdown — for pasting into an AI for advice.
+func copyBrew(_ brew: Brew) {
+    UIPasteboard.general.string = BrewMarkdown.string(for: brew)
+    Haptics.success()
 }
 
 /// One brew in the log.
@@ -56,6 +63,7 @@ struct BrewRow: View {
                 }
                 Menu {
                     Button { onEdit() } label: { Label("Edit brew", systemImage: "pencil") }
+                    Button { copyBrew(brew) } label: { Label("Copy as text", systemImage: "doc.on.doc") }
                     Button(role: .destructive) { onDelete() } label: {
                         Label("Delete brew", systemImage: "trash")
                     }

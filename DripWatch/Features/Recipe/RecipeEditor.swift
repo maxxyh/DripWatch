@@ -329,8 +329,9 @@ private struct RatioField: View {
     }
 }
 
-/// A typeable time field. Enter `m:ss` (e.g. `2:30`) or plain seconds (`30`); the value is
-/// stored as seconds. No steppers — type it once and move on.
+/// A time field you fill with just digits — no colon to type. "230" → 2:30, "45" → 0:45,
+/// "28" → 0:28. Shows the raw digits while editing (number pad), and formats to m:ss when you
+/// tap away.
 private struct TimeInputField: View {
     let label: String
     @Binding var seconds: Int?
@@ -344,39 +345,47 @@ private struct TimeInputField: View {
             Label(label, systemImage: systemImage).font(.subheadline).foregroundStyle(.secondary)
             Spacer()
             TextField("—", text: $text)
-                .keyboardType(.numbersAndPunctuation)
+                .keyboardType(.numberPad)
                 .multilineTextAlignment(.trailing)
                 .focused($focused)
                 .font(.param(.body, weight: .semibold))
                 .frame(maxWidth: 80)
-                .onChange(of: text) { _, newValue in seconds = parseTime(newValue) }
-                .onChange(of: focused) { _, isFocused in
-                    // Re-format to canonical m:ss when the user finishes editing.
-                    if !isFocused { text = seconds.map { timeText($0) } ?? "" }
+                .onChange(of: text) { _, newValue in
+                    let digits = newValue.filter(\.isNumber)
+                    if digits != newValue { text = digits }
+                    seconds = secondsFromDigits(digits)
                 }
-                .onChange(of: seconds) { _, newValue in
-                    // Keep in sync when seeded/changed externally (but not while typing).
-                    if !focused { text = newValue.map { timeText($0) } ?? "" }
-                }
+                .onChange(of: focused) { _, isFocused in syncText(editing: isFocused) }
+                .onChange(of: seconds) { _, newValue in if !focused { text = newValue.map { timeText($0) } ?? "" } }
         }
         .onAppear { text = seconds.map { timeText($0) } ?? "" }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label)
         .accessibilityValue(seconds.map { timeText($0) } ?? "not set")
     }
+
+    /// Show raw digits while editing (natural for the number pad), formatted m:ss when done.
+    private func syncText(editing: Bool) {
+        text = editing ? (seconds.map { secondsToDigits($0) } ?? "")
+                       : (seconds.map { timeText($0) } ?? "")
+    }
 }
 
-/// Parses "m:ss" or a plain seconds string into total seconds. Empty → nil.
-private func parseTime(_ raw: String) -> Int? {
-    let t = raw.trimmingCharacters(in: .whitespaces)
-    guard !t.isEmpty else { return nil }
-    if t.contains(":") {
-        let parts = t.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
-        let m = Int(parts[0]) ?? 0
-        let s = parts.count > 1 ? (Int(parts[1]) ?? 0) : 0
-        return max(0, m * 60 + s)
-    }
-    return Int(t).map { max(0, $0) }
+/// Digits typed on a number pad → seconds. The last two digits are seconds, the rest minutes:
+/// "45" → 45s, "230" → 2:30, "1230" → 12:30. Empty → nil.
+func secondsFromDigits(_ raw: String) -> Int? {
+    let d = raw.filter(\.isNumber)
+    guard !d.isEmpty else { return nil }
+    if d.count <= 2 { return Int(d) }
+    let secs = Int(d.suffix(2)) ?? 0
+    let mins = Int(d.dropLast(2)) ?? 0
+    return mins * 60 + secs
+}
+
+/// Seconds → the digit string you'd type for them (round-trips with `secondsFromDigits`).
+func secondsToDigits(_ seconds: Int) -> String {
+    let m = seconds / 60, s = seconds % 60
+    return m > 0 ? "\(m)\(String(format: "%02d", s))" : "\(s)"
 }
 
 /// Editable per-pour list, driven by the pour *count* so you don't add rows one-by-one: set
@@ -504,8 +513,8 @@ private struct PourRow: View {
     }
 }
 
-/// A compact typeable time cell for a pour (m:ss or plain seconds). Mirrors TimeInputField but
-/// pill-shaped and fixed-width for the row layout.
+/// A compact digit-entry time cell for a pour — no colon to type (see TimeInputField). Pill-shaped
+/// and fixed-width for the row layout.
 private struct PourTimeField: View {
     let placeholder: String
     @Binding var seconds: Int?
@@ -514,15 +523,22 @@ private struct PourTimeField: View {
 
     var body: some View {
         TextField(placeholder, text: $text)
-            .keyboardType(.numbersAndPunctuation)
+            .keyboardType(.numberPad)
             .multilineTextAlignment(.center)
             .focused($focused)
             .font(.param(.subheadline))
             .frame(width: 54)
             .padding(.vertical, 4)
             .background(Theme.crema.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
-            .onChange(of: text) { _, v in seconds = parseTime(v) }
-            .onChange(of: focused) { _, isFocused in if !isFocused { text = seconds.map { timeText($0) } ?? "" } }
+            .onChange(of: text) { _, v in
+                let digits = v.filter(\.isNumber)
+                if digits != v { text = digits }
+                seconds = secondsFromDigits(digits)
+            }
+            .onChange(of: focused) { _, isFocused in
+                text = isFocused ? (seconds.map { secondsToDigits($0) } ?? "")
+                                 : (seconds.map { timeText($0) } ?? "")
+            }
             .onChange(of: seconds) { _, v in if !focused { text = v.map { timeText($0) } ?? "" } }
             .onAppear { text = seconds.map { timeText($0) } ?? "" }
             .accessibilityLabel(placeholder == "end" ? "Pour end time" : "Pour start time")

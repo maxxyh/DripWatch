@@ -629,11 +629,13 @@ struct ChipField: View {
                     .textInputAutocapitalization(autocapitalization)
                     .font(.subheadline)
                     .focused($focused)
-                    .onSubmit(add)
+                    .submitLabel(.next)
+                    // Return adds the tag and keeps the keyboard up for the next one.
+                    .onSubmit { add(); focused = true }
                     // Commit whatever's typed when the field loses focus (e.g. tapping Save),
                     // so a note you typed but didn't "enter" isn't silently lost.
                     .onChange(of: focused) { _, isFocused in if !isFocused { add() } }
-                Button(action: add) { Image(systemName: "return").hitTarget(36) }
+                Button { add(); focused = true } label: { Image(systemName: "return").hitTarget(36) }
                     .buttonStyle(.plain).foregroundStyle(Theme.accent)
                     .disabled(entry.nilIfBlank == nil)
                     .accessibilityLabel("Add \(title)")
