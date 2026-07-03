@@ -21,22 +21,10 @@ struct GrindSetting: Codable, Hashable {
         self.major = major
         self.clickOffset = clickOffset
     }
-
-    enum CodingKeys: String, CodingKey { case grinderName, major, clickOffset }
-
-    /// `major` used to be an `Int`. SwiftData persists this value with a strict (plist) coder that
-    /// won't read an `Int`-encoded value back as a `Double`, so brews saved by older builds would
-    /// crash on load. Decode `major` as a `Double`, falling back to an `Int`, so old data opens.
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        grinderName = try c.decode(String.self, forKey: .grinderName)
-        if let d = try? c.decode(Double.self, forKey: .major) {
-            major = d
-        } else {
-            major = Double(try c.decode(Int.self, forKey: .major))
-        }
-        clickOffset = try c.decode(Int.self, forKey: .clickOffset)
-    }
+    // NOTE: do NOT add a custom Codable init(from:) here. SwiftData flattens this struct into
+    // columns using the *synthesized* Codable conformance; a hand-written init(from:) breaks its
+    // composite decoder and crashes on load (even for correctly-stored data). The `major` Int→Double
+    // change was the launch crash on old stores — the fix is a fresh store, not a tolerant decoder.
 
     /// The click offset rendered like the notebook: `(+2)`, `(−1)`, or empty when zero.
     var offsetText: String {

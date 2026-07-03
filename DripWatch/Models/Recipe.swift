@@ -28,7 +28,27 @@ struct Pour: Codable, Hashable, Identifiable {
 /// everything is optional so a recipe can be as terse as `92°, 4 pours, 1:15` or expand into
 /// a full per-pour breakdown only when wanted.
 struct Recipe: Codable, Hashable {
-    var grind: GrindSetting?
+    // Grind is stored as flat optional scalars, NOT an optional nested `GrindSetting?`: SwiftData
+    // flattens embedded Codable structs into columns, and its decoder *crashes* on a nil nested
+    // struct (i.e. any brew logged without a grind — `EXC_BREAKPOINT` in GrindSetting.init(from:)).
+    // Optional scalars decode fine. `grind` below is a computed façade so the rest of the app is
+    // unchanged.
+    var grinderName: String?
+    var grindMajor: Double?
+    var grindClickOffset: Int?
+
+    var grind: GrindSetting? {
+        get {
+            guard let grinderName else { return nil }
+            return GrindSetting(grinderName: grinderName, major: grindMajor ?? 0, clickOffset: grindClickOffset ?? 0)
+        }
+        set {
+            grinderName = newValue?.grinderName
+            grindMajor = newValue?.major
+            grindClickOffset = newValue?.clickOffset
+        }
+    }
+
     var waterTempC: Int?
     var doseGrams: Double?
     /// Ratio as the denominator, e.g. `15` means 1:15.
