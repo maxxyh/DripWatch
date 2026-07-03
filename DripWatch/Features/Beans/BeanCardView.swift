@@ -42,7 +42,7 @@ struct BeanCardView: View {
 
     private var photoContent: some View {
         ZStack {
-            if let data = bean.primaryPhotoData, let ui = UIImage(data: data) {
+            if let data = bean.primaryPhotoData, let ui = heroImage(from: data) {
                 Image(uiImage: ui)
                     .resizable()
                     .scaledToFill()
@@ -60,9 +60,10 @@ struct BeanCardView: View {
         .clipped()
         .contentShape(Rectangle())
         .overlay(alignment: .topLeading) {
-            // A hint that there's more than one bag surface to swipe through.
-            if bean.photoDatas.count > 1 {
-                Chip(text: "\(bean.photoDatas.count)", symbol: "photo.on.rectangle", tint: .white)
+            // A hint that there's more than one bag surface to swipe through. Uses the cheap
+            // count (no image blobs loaded).
+            if bean.photoCount > 1 {
+                Chip(text: "\(bean.photoCount)", symbol: "photo.on.rectangle", tint: .white)
                     .background(.ultraThinMaterial, in: Capsule())
                     .padding(10)
             }
@@ -76,6 +77,15 @@ struct BeanCardView: View {
                     .background(.ultraThinMaterial, in: Capsule())
                     .padding(10)
             }
+        }
+    }
+
+    /// The hero image — a small cached thumbnail on the shelf (memory-safe across many cards),
+    /// full resolution on the detail header where it's the only image on screen.
+    private func heroImage(from data: Data) -> UIImage? {
+        switch style {
+        case .shelf: return ThumbnailCache.image(id: bean.id.uuidString, data: data, maxPixel: 600)
+        case .full:  return UIImage(data: data)
         }
     }
 

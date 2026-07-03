@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import DripWatch
 
 struct GrindSettingTests {
@@ -27,5 +28,23 @@ struct GrindSettingTests {
         #expect(GrindSetting(grinderName: "DF54", major: 5).majorText == "5")
         #expect(GrindSetting(grinderName: "DF54", major: 4.5).majorText == "4.5")
         #expect(GrindSetting(grinderName: "DF54", major: 4.5).display == "DF54 · 4.5")
+    }
+
+    @Test func decodesLegacyIntMajorFromStrictCoder() throws {
+        // `major` used to be an Int, persisted by SwiftData's strict plist coder. A brew saved by
+        // an old build must still decode (this is the launch crash we shipped and fixed).
+        let legacy: [String: Any] = ["grinderName": "1Zpresso J", "major": 3, "clickOffset": -1]
+        let data = try PropertyListSerialization.data(fromPropertyList: legacy, format: .binary, options: 0)
+        let g = try PropertyListDecoder().decode(GrindSetting.self, from: data)
+        #expect(g.grinderName == "1Zpresso J")
+        #expect(g.major == 3)
+        #expect(g.clickOffset == -1)
+    }
+
+    @Test func decodesDoubleMajorFromStrictCoder() throws {
+        let current: [String: Any] = ["grinderName": "DF54", "major": 4.5, "clickOffset": 0]
+        let data = try PropertyListSerialization.data(fromPropertyList: current, format: .binary, options: 0)
+        let g = try PropertyListDecoder().decode(GrindSetting.self, from: data)
+        #expect(g.major == 4.5)
     }
 }

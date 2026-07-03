@@ -59,21 +59,34 @@ final class Bean: Syncable {
             .filter { !$0.isEmpty }
     }
 
-    /// Active photos, hero first. Empty relationship falls back to the legacy `bagPhoto`.
+    /// Active photos in display order (by `order`). Does not touch the external image blobs —
+    /// callers that need pixels read `.data` on the specific photo they'll show.
     var orderedPhotos: [BeanPhoto] {
-        photos.filter { $0.deletedAt == nil && $0.data != nil }.sorted { $0.order < $1.order }
+        photos.filter { $0.deletedAt == nil }.sorted { $0.order < $1.order }
     }
 
-    /// Every bag image as raw data, hero first — the gallery, with legacy fallback.
+    /// How many bag photos there are, WITHOUT loading any image data — used for the shelf badge.
+    /// Loading every blob just to count them is what used to blow up memory on the shelf.
+    var photoCount: Int {
+        let n = orderedPhotos.count
+        return n > 0 ? n : (bagPhoto != nil ? 1 : 0)
+    }
+
+    /// The hero image's data only — reads a single blob (stops at the first present photo),
+    /// rather than loading the whole gallery just to show one thumbnail.
+    var primaryPhotoData: Data? {
+        for photo in orderedPhotos { if let data = photo.data { return data } }
+        return bagPhoto
+    }
+
+    /// Every bag image as raw data, hero first — the full gallery. Loads all blobs, so only call
+    /// this when the gallery is actually on screen (the full-screen viewer), never on the shelf.
     var photoDatas: [Data] {
         let list = orderedPhotos.compactMap(\.data)
         if !list.isEmpty { return list }
         if let bagPhoto { return [bagPhoto] }
         return []
     }
-
-    /// The hero visual — first gallery photo, else the legacy single photo.
-    var primaryPhotoData: Data? { photoDatas.first }
 
     /// Active brews, newest first — the history log.
     var timeline: [Brew] {

@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import ImageIO
 
 /// Add or edit a "bag" (character card), presented as a sheet. The photo leads because it's
 /// the card's hero — snap it with the camera or pick from the library. Every text field keeps
@@ -526,6 +527,37 @@ struct CameraPicker: UIViewControllerRepresentable {
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.dismiss()
         }
+    }
+}
+
+/// Downsamples image data to a thumbnail bitmap no larger than `maxPixel` on its longest side,
+/// via ImageIO — the full-resolution bitmap is never decoded. Essential for the shelf, where
+/// decoding every bean's hero at full size (and, previously, loading every photo) blew up memory.
+func downsampledImage(_ data: Data, maxPixel: CGFloat) -> UIImage? {
+    let options: [CFString: Any] = [
+        kCGImageSourceCreateThumbnailFromImageAlways: true,
+        kCGImageSourceCreateThumbnailWithTransform: true,
+        kCGImageSourceShouldCacheImmediately: true,
+        kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+    ]
+    guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+          let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+        return nil
+    }
+    return UIImage(cgImage: cg)
+}
+
+/// A tiny decoded-thumbnail cache so scrolling the shelf doesn't re-downsample every frame.
+/// Keyed by identity + byte count so a changed photo produces a new key; evicts under pressure.
+enum ThumbnailCache {
+    private static let cache = NSCache<NSString, UIImage>()
+
+    static func image(id: String, data: Data, maxPixel: CGFloat) -> UIImage? {
+        let key = "\(id)-\(data.count)" as NSString
+        if let hit = cache.object(forKey: key) { return hit }
+        guard let image = downsampledImage(data, maxPixel: maxPixel) else { return nil }
+        cache.setObject(image, forKey: key)
+        return image
     }
 }
 
