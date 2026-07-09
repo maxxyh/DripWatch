@@ -134,8 +134,9 @@ struct BrewCaptureView: View {
             .onChange(of: brewedAt) { _, _ in edited = true; persist() }
             .onChange(of: planNext) { _, on in
                 // Opening the plan for the first time pre-fills it with everything you just
-                // brewed, so you change only what you want rather than starting from blank.
-                if on, !nextDraftSeeded { nextDraft = recipe; nextDraftSeeded = true }
+                // brewed — minus the measured times (shot / drawdown), which you don't plan —
+                // so you change only what you want rather than starting from blank.
+                if on, !nextDraftSeeded { nextDraft = recipe.asPlanSeed; nextDraftSeeded = true }
                 edited = true; persist()
             }
             .onChange(of: nextDraft) { _, _ in nextDraftSeeded = true; edited = true; persist() }

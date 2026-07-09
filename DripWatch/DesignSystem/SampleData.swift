@@ -60,9 +60,10 @@ enum SampleData {
         b2.bean = voyager
         context.insert(b2)
 
-        // The pending plan for the next pourover.
+        // The pending plan for the next pourover. asPlanSeed drops the measured drawdown — you
+        // plan the dials, not the number you sit and watch.
         voyager.pendingNextPourover = {
-            var r = b2.recipe
+            var r = b2.recipe.asPlanSeed
             r.grind = GrindSetting(grinderName: jMax, major: 3, clickOffset: 1)   // back finer
             r.waterTempC = 91
             r.notes = "meet in the middle: finer than 23/06, hotter"
@@ -93,7 +94,7 @@ enum SampleData {
         esp.bean = crimson
         context.insert(esp)
         crimson.pendingNextEspresso = {
-            var r = esp.recipe
+            var r = esp.recipe.asPlanSeed   // drops the measured shot time — not a planned dial
             r.grind = GrindSetting(grinderName: "Niche Zero", major: 11, clickOffset: 0)   // finer
             r.surfWaitSec = 11; r.preInfusionSec = 8
             r.notes = "finer, longer surf & pre-infusion to tame the sharpness"

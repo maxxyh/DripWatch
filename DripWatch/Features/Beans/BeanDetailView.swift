@@ -116,11 +116,14 @@ struct BeanDetailView: View {
     }
 
     private func nextPlanCard(_ next: Recipe, method: BrewMethod) -> some View {
-        Button {
+        // The delta vs. the last brew, so "what am I changing?" is answerable at a glance —
+        // right on the card, without opening the editor.
+        let changes = bean.lastBrew(for: method).map { BrewDiff.changes(from: $0.recipe, to: next) } ?? []
+        return Button {
             Haptics.tap()
             editingPlan = method
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Label("Plan for next \(method.label.lowercased())", systemImage: "arrow.turn.down.right")
                         .font(.subheadline.weight(.semibold))
@@ -129,6 +132,19 @@ struct BeanDetailView: View {
                     Image(systemName: "square.and.pencil")
                         .font(.footnote).foregroundStyle(Theme.accent)
                         .accessibilityHidden(true)
+                }
+                if !changes.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Change from your last brew").overline()
+                        WrapLayout(spacing: 6, lineSpacing: 6) {
+                            ForEach(changes, id: \.self) { Chip(text: $0, symbol: "arrow.right", tint: Theme.accent) }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Change from your last brew: \(changes.joined(separator: ", "))")
                 }
                 RecipeReadout(recipe: next)
             }

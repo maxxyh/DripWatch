@@ -88,6 +88,18 @@ struct Recipe: Codable, Hashable {
         return r
     }
 
+    /// A copy suitable for seeding the *next-brew plan*: the two measured outcomes you sit and
+    /// watch for — shot time (espresso) and total drawdown (pourover) — are dropped. They're
+    /// observed, not dialled, and the most variable numbers on the sheet, so a plan never
+    /// pre-specifies them; you measure them fresh each brew. You can still type a target into the
+    /// plan by hand — this only strips the value auto-carried from a previous brew.
+    var asPlanSeed: Recipe {
+        var r = self
+        r.shotTimeSec = nil
+        r.totalDrawdownSec = nil
+        return r
+    }
+
     /// Brew ratio for espresso (yield ÷ dose), e.g. 2.0 for a 1:2 shot.
     var shotRatio: Double? {
         guard let d = doseGrams, d > 0, let y = yieldGrams else { return nil }
