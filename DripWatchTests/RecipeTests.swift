@@ -27,6 +27,20 @@ struct RecipeTests {
         #expect(Recipe().isEmpty)
     }
 
+    @Test func planSeedDropsMeasuredTimesButKeepsDials() {
+        var r = Recipe()
+        r.doseGrams = 18; r.yieldGrams = 42; r.ratio = 2.3
+        r.shotTimeSec = 40; r.totalDrawdownSec = 150
+        let seed = r.asPlanSeed
+        // The measured outcomes you sit and watch for are not planned.
+        #expect(seed.shotTimeSec == nil)
+        #expect(seed.totalDrawdownSec == nil)
+        // Everything you actually dial in is preserved.
+        #expect(seed.doseGrams == 18)
+        #expect(seed.yieldGrams == 42)
+        #expect(seed.ratio == 2.3)
+    }
+
     @Test func blankPourDoesNotMakeRecipeNonEmpty() {
         var r = Recipe()
         r.pours = [Pour(order: 1)]   // an "Add pour" row the user never filled in

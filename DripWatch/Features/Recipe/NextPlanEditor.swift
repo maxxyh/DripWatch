@@ -21,7 +21,9 @@ struct NextPlanEditor: View {
         self.bean = bean
         self.method = method
         self.onBrew = onBrew
-        _draft = State(initialValue: bean.pendingNextRecipe(for: method) ?? bean.seedRecipe(for: method))
+        // Seed from the pending plan if there is one, else from the last brew — but with the
+        // measured times (shot / drawdown) dropped, since those aren't things you plan.
+        _draft = State(initialValue: bean.pendingNextRecipe(for: method) ?? bean.seedRecipe(for: method).asPlanSeed)
     }
 
     /// The brew this plan is a change *from* — the newest brew of the same method.
