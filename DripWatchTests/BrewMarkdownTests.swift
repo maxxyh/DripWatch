@@ -16,6 +16,20 @@ struct BrewMarkdownTests {
         #expect(secondsToDigits(90) == "130")
     }
 
+    @Test func liveTimeEntryFormatsAsClockWhileTyping() {
+        // Digits shift in from the right: typing 2, 1, 0 walks the field 0:02 → 0:21 → 2:10.
+        #expect(liveTimeEntry("2").text == "0:02")
+        #expect(liveTimeEntry("21").text == "0:21")
+        #expect(liveTimeEntry("210").text == "2:10")
+        // A colon already in the field (from the previous render) is ignored — digits are re-read.
+        #expect(liveTimeEntry("0:210").text == "2:10")
+        #expect(liveTimeEntry("2:10").seconds == 2 * 60 + 10)
+        // Empty clears to the placeholder; entry is capped at 4 digits (99:59).
+        #expect(liveTimeEntry("").text == "")
+        #expect(liveTimeEntry("").seconds == nil)
+        #expect(liveTimeEntry("12345").text == "12:34")
+    }
+
     @Test func markdownIncludesBeanRecipeAndTaste() {
         let bean = Bean(name: "Voyager")
         bean.roasterName = "Voyager Craft"

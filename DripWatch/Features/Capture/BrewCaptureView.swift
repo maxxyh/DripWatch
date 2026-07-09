@@ -746,13 +746,9 @@ struct BrewTimerField: View {
                     .font(.param(.title, weight: .semibold))
                     .frame(maxWidth: 92)
                     .onChange(of: text) { _, newValue in
-                        let digits = newValue.filter(\.isNumber)
-                        if digits != newValue { text = digits }
-                        seconds = secondsFromDigits(digits)
-                    }
-                    .onChange(of: focused) { _, isFocused in
-                        text = isFocused ? (seconds.map { secondsToDigits($0) } ?? "")
-                                         : (seconds.map { timeText($0) } ?? "")
+                        let (formatted, secs) = liveTimeEntry(newValue)
+                        if formatted != newValue { text = formatted }
+                        seconds = secs
                     }
                     .onChange(of: seconds) { _, v in if !focused { text = v.map { timeText($0) } ?? "" } }
                     .onAppear { text = seconds.map { timeText($0) } ?? "" }
@@ -771,6 +767,11 @@ struct BrewTimerField: View {
             .controlSize(.regular)
             .tint(running ? Theme.accent : Color.secondary)
             .accessibilityLabel(running ? "Stop timing \(label)" : "Start timing \(label)")
+        }
+        // Advancing the phase (or dismissing) while the stopwatch is still running would tear
+        // this view down and drop the elapsed time — the one number you're timing. Capture it.
+        .onDisappear {
+            if running { seconds = elapsed(at: .now); running = false }
         }
     }
 
