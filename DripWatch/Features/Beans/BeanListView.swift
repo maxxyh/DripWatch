@@ -16,19 +16,24 @@ struct BeanListView: View {
                 if activeBeans.isEmpty {
                     emptyState
                 } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            masonry(shelfBeans)
-                            if !finishedBeans.isEmpty {
-                                HStack {
-                                    Text("Finished").font(.headline)
-                                    Spacer()
-                                    Text("\(finishedBeans.count)").font(.subheadline).foregroundStyle(.secondary)
+                    // Pin each column to exactly half the width so a wide card can never push the
+                    // content past the viewport (which would let the shelf scroll sideways).
+                    GeometryReader { geo in
+                        let colWidth = max(0, (geo.size.width - Theme.Space.m * 2 - 14) / 2)
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 20) {
+                                masonry(shelfBeans, colWidth: colWidth)
+                                if !finishedBeans.isEmpty {
+                                    HStack {
+                                        Text("Finished").font(.headline)
+                                        Spacer()
+                                        Text("\(finishedBeans.count)").font(.subheadline).foregroundStyle(.secondary)
+                                    }
+                                    masonry(finishedBeans, colWidth: colWidth).opacity(0.6)
                                 }
-                                masonry(finishedBeans).opacity(0.6)
                             }
+                            .padding(Theme.Space.m)
                         }
-                        .padding(Theme.Space.m)
                     }
                 }
             }
@@ -94,15 +99,15 @@ struct BeanListView: View {
 
     /// Two columns, each bean greedily placed in the currently-shorter column (estimated from its
     /// content) so cards pack tightly instead of leaving the ragged row gaps a grid would.
-    private func masonry(_ beans: [Bean]) -> some View {
+    private func masonry(_ beans: [Bean], colWidth: CGFloat) -> some View {
         let split = balancedColumns(beans)
         return HStack(alignment: .top, spacing: 14) {
-            column(split.left)
-            column(split.right)
+            column(split.left, colWidth: colWidth)
+            column(split.right, colWidth: colWidth)
         }
     }
 
-    private func column(_ beans: [Bean]) -> some View {
+    private func column(_ beans: [Bean], colWidth: CGFloat) -> some View {
         VStack(spacing: 14) {
             ForEach(beans) { bean in
                 NavigationLink(value: bean.id) {
@@ -111,7 +116,7 @@ struct BeanListView: View {
                 .buttonStyle(.plain)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .top)
+        .frame(width: colWidth, alignment: .top)
     }
 
     private func balancedColumns(_ beans: [Bean]) -> (left: [Bean], right: [Bean]) {
