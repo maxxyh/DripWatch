@@ -703,8 +703,10 @@ struct ChipField: View {
     }
 
     private func add() {
-        guard let v = entry.nilIfBlank else { return }
-        if !items.contains(v) { items.append(v); Haptics.select() }
+        guard let v = entry.nilIfBlank?.normalizedTerm else { return }
+        if !items.contains(where: { $0.caseInsensitiveCompare(v) == .orderedSame }) {
+            items.append(v); Haptics.select()
+        }
         entry = ""
     }
 }

@@ -35,7 +35,10 @@ struct DripWatchApp: App {
     var body: some Scene {
         WindowGroup {
             BeanListView()
-                .task { SampleData.seedIfRequested(container.mainContext) }
+                .task {
+                    SampleData.seedIfRequested(container.mainContext)
+                    DataMaintenance.normalizeExistingIfNeeded(container.mainContext)
+                }
         }
         .modelContainer(container)
     }

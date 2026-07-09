@@ -77,6 +77,90 @@ struct BagOCRTests {
         #expect(!taught.unresolved.contains("Zephyrine"))
     }
 
+    @Test func crimsonMultiLineTasteNotes() {
+        // Real OCR from the Crimson bag: a "TASTE NOTES:" label with the notes wrapping onto a
+        // second line. Previously the whole thing was ignored.
+        let lines = [
+            line("crimson", x: 0.3, y: 0.90, w: 0.4, h: 0.06),
+            line("#2 VIETNAM AMAZING CUP 2021 ARABICA CATEGORY", x: 0.1, y: 0.80, w: 0.8),
+            line("ZONE: huong phung, huong hoa, quang tri", x: 0.1, y: 0.70, w: 0.8),
+            line("VARIETY: THA1", x: 0.1, y: 0.55, w: 0.4),
+            line("PROCESSING: anoxic natural", x: 0.1, y: 0.48, w: 0.5),
+            line("TASTE NOTES: pineapple, dried guava, prune,", x: 0.1, y: 0.40, w: 0.8),
+            line("dark chocolate aftertaste", x: 0.1, y: 0.36, w: 0.5),
+            line("(18:210) 96B", x: 0.1, y: 0.20, w: 0.3),
+        ]
+        let bag = BagOCR.parse(lines)
+        #expect(bag.name == "crimson")
+        #expect(bag.varietal == "THA1")
+        #expect(bag.process?.lowercased().contains("anoxic natural") == true)
+        #expect(bag.country == "Vietnam")
+        let notes = (bag.roasterNotes ?? "").lowercased()
+        #expect(notes.contains("pineapple"))
+        #expect(notes.contains("dried guava"))
+        #expect(notes.contains("prune"))
+        #expect(notes.contains("dark chocolate aftertaste"))
+    }
+
+    @Test func verticalColumnarLabelsPairDownward() {
+        // Real OCR from the Ijen Lestari bag: labels stacked *above* their values (PRODUCER over
+        // "The Dharmawan Family", VARIETIES over "USDA 762, Kartika"), in two side-by-side columns.
+        let lines = [
+            line("IJEN LESTARI", x: 0.30, y: 0.55, w: 0.40, h: 0.030),
+            line("ORIGIN:", x: 0.18, y: 0.37, w: 0.07, h: 0.015),
+            line("EAST JAVA, INDONESIA", x: 0.19, y: 0.35, w: 0.20, h: 0.016),
+            line("PROCESSING:", x: 0.19, y: 0.31, w: 0.12, h: 0.019),
+            line("PRODUCER:", x: 0.51, y: 0.30, w: 0.11, h: 0.013),
+            line("CARBONIC MACERATION NATURAL", x: 0.19, y: 0.29, w: 0.29, h: 0.021),
+            line("THE DHARMAWAN FAMILY", x: 0.51, y: 0.29, w: 0.22, h: 0.017),
+            line("VARIETIES:", x: 0.19, y: 0.26, w: 0.10, h: 0.017),
+            line("USDA 762, KARTIKA", x: 0.20, y: 0.24, w: 0.16, h: 0.020),
+        ]
+        let bag = BagOCR.parse(lines)
+        #expect(bag.farm?.uppercased().contains("DHARMAWAN") == true)
+        #expect(bag.varietal?.uppercased().contains("USDA 762") == true)
+        #expect(bag.varietal?.uppercased().contains("KARTIKA") == true)
+        #expect(bag.process?.lowercased().contains("carbonic maceration") == true)
+        #expect(bag.country?.contains("Java") == true)
+    }
+
+    @Test func pipeSeparatedLabelsAndNotes() {
+        // Alo Coffee: "|"-separated inline labels and notes.
+        let lines = [
+            line("FILTER", x: 0.15, y: 0.90, w: 0.1),
+            line("ALO COFFEE", x: 0.4, y: 0.55, w: 0.4, h: 0.05),
+            line("NATURAL ANAEROBIC ETHIOPIA", x: 0.35, y: 0.47, w: 0.5),
+            line("MANGO | PURPLE GRAPE | WHITE PEACH", x: 0.35, y: 0.40, w: 0.5),
+            line("PRODUCER | TAMIRU TADESSE", x: 0.5, y: 0.18, w: 0.4),
+            line("VARIETAL | 74158", x: 0.5, y: 0.15, w: 0.3),
+        ]
+        let bag = BagOCR.parse(lines)
+        #expect(bag.name == "ALO COFFEE")
+        #expect(bag.country?.lowercased() == "ethiopia")
+        #expect(bag.farm?.uppercased().contains("TAMIRU TADESSE") == true)
+        #expect(bag.varietal == "74158")
+        #expect(bag.process?.lowercased().contains("natural anaerobic") == true)
+        let notes = (bag.roasterNotes ?? "").lowercased()
+        #expect(notes.contains("mango") && notes.contains("purple grape") && notes.contains("white peach"))
+    }
+
+    @Test func fincaFarmIsNotMistakenForVariety() {
+        // "Finca Varietales" contains "varietal" but is a farm, not a variety label; the notes and
+        // farm share a "|". The origin header must not become the name.
+        let lines = [
+            line("colombia", x: 0.4, y: 0.90, w: 0.3, h: 0.04),
+            line("Yenifer Rojas Trujillo", x: 0.3, y: 0.82, w: 0.5, h: 0.03),
+            line("Finca Varietales | blackberry, tropical fruits, floral", x: 0.15, y: 0.74, w: 0.7),
+        ]
+        let bag = BagOCR.parse(lines)
+        #expect(bag.name == "Yenifer Rojas Trujillo")
+        #expect(bag.country?.lowercased() == "colombia")
+        #expect(bag.farm?.contains("Finca Varietales") == true)
+        #expect(bag.varietal == nil)
+        let notes = (bag.roasterNotes ?? "").lowercased()
+        #expect(notes.contains("blackberry") && notes.contains("tropical fruits") && notes.contains("floral"))
+    }
+
     @Test func aValueIsNotClaimedByTwoFields() {
         // One value line on a shared row must be consumed by the first matching label only.
         let lines = [
