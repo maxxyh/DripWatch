@@ -10,6 +10,10 @@ struct BeanDetailView: View {
 
     @State private var captureMethod: BrewMethod?
     @State private var editingBrew: Brew?
+    @State private var editingPlan: BrewMethod?
+    /// Set when the plan editor asks to start a brew; launched after that sheet dismisses so we
+    /// never present two sheets at once.
+    @State private var pendingBrewMethod: BrewMethod?
     @State private var editingBean = false
     @State private var confirmingDelete = false
     @State private var preview: PreviewPhoto?
@@ -90,6 +94,16 @@ struct BeanDetailView: View {
         .sheet(item: $editingBrew) { brew in
             BrewCaptureView(bean: bean, editing: brew)
         }
+        .sheet(item: $editingPlan, onDismiss: {
+            if let method = pendingBrewMethod { pendingBrewMethod = nil; captureMethod = method }
+        }) { method in
+            NextPlanEditor(bean: bean, method: method) {
+                // Brew from the plan: remember the choice, close this sheet, then the onDismiss
+                // above opens the capture (seeded from the plan we just saved).
+                pendingBrewMethod = method
+                editingPlan = nil
+            }
+        }
         .sheet(isPresented: $editingBean) {
             AddBeanView(editing: bean)
         }
@@ -104,12 +118,18 @@ struct BeanDetailView: View {
     private func nextPlanCard(_ next: Recipe, method: BrewMethod) -> some View {
         Button {
             Haptics.tap()
-            captureMethod = method
+            editingPlan = method
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Plan for next \(method.label.lowercased())", systemImage: "arrow.turn.down.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.accent)
+                HStack {
+                    Label("Plan for next \(method.label.lowercased())", systemImage: "arrow.turn.down.right")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                    Spacer()
+                    Image(systemName: "square.and.pencil")
+                        .font(.footnote).foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
+                }
                 RecipeReadout(recipe: next)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -121,7 +141,7 @@ struct BeanDetailView: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityHint("Starts a new \(method.label.lowercased()) from this plan")
+        .accessibilityHint("Edit this plan, or brew from it")
     }
 
     private var brewButtons: some View {

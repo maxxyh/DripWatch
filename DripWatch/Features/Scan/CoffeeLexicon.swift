@@ -77,8 +77,9 @@ enum CoffeeLexicon {
 
     // Ordered longest-first so "medium-dark" wins over "medium".
     static let processes: [String] = [
-        "anaerobic natural", "anoxic natural", "carbonic maceration", "double fermented",
-        "wet hulled", "washed", "natural", "honey", "anaerobic", "anoxic", "fermented", "pulped",
+        "anaerobic natural", "natural anaerobic", "anoxic natural", "carbonic maceration",
+        "double fermented", "wet hulled", "washed", "natural", "honey", "anaerobic", "anoxic",
+        "fermented", "pulped",
     ]
 
     static let roastLevels: [String] = [
@@ -91,6 +92,7 @@ enum CoffeeLexicon {
         "vanilla", "honey", "floral", "jasmine", "citrus", "orange", "lemon", "lime",
         "berry", "blueberry", "strawberry", "raspberry", "cherry", "plum", "peach", "apricot",
         "apple", "grape", "raisin", "date", "fig", "mango", "pineapple", "guava", "tropical",
+        "tangerine", "blackberry", "mandarin", "lychee", "melon", "papaya", "passionfruit",
         "molasses", "toffee", "brown sugar", "maple", "malt", "spice", "cinnamon", "clove",
         "black tea", "bergamot", "wine", "winey", "juicy", "creamy", "buttery", "milk chocolate",
         "dark chocolate", "stone fruit", "red fruit",
@@ -114,6 +116,11 @@ enum CoffeeLexicon {
         // 1. Learned whole-segment match wins outright.
         if let field = learned[lower] { return ([FieldMatch(field: field, value: cleaned(segment))], []) }
 
+        // A "Finca …" / "Hacienda …" / "… Estate" segment is a farm.
+        if lower.hasPrefix("finca") || lower.hasPrefix("hacienda") || lower.contains(" estate") {
+            return ([FieldMatch(field: .farm, value: cleaned(segment))], [])
+        }
+
         var matches: [FieldMatch] = []
 
         // 2. Multi-word phrases (checked before single tokens so "pink bourbon" beats "bourbon").
@@ -128,7 +135,9 @@ enum CoffeeLexicon {
         for token in tokens(in: segment) {
             let t = token.lowercased()
             if let field = learned[t] { matches.append(FieldMatch(field: field, value: cleaned(token))) }
-            else if countries.contains(t) { matches.append(FieldMatch(field: .country, value: cleaned(token))) }
+            // Countries are proper place names — title-case them ("VIETNAM" → "Vietnam") so the
+            // filled field reads consistently regardless of the bag's ALL-CAPS printing.
+            else if countries.contains(t) { matches.append(FieldMatch(field: .country, value: cleaned(token).capitalized)) }
             else if varietals.contains(t) { matches.append(FieldMatch(field: .varietal, value: cleaned(token))) }
         }
 
@@ -142,6 +151,14 @@ enum CoffeeLexicon {
         if matches.isEmpty, isMeaningful(segment) { unknowns.append(cleaned(segment)) }
 
         return (deduped(matches), unknowns)
+    }
+
+    /// True if the text mentions any known flavour. Used to keep collecting wrapped tasting-note
+    /// lines even when another word (e.g. a roast level like "dark" in "dark chocolate aftertaste")
+    /// would otherwise shadow the flavour in `classifySegment`.
+    static func hasTastingNote(_ text: String) -> Bool {
+        let l = text.lowercased()
+        return tastingNotes.contains { l.contains($0) }
     }
 
     // MARK: Helpers

@@ -260,7 +260,7 @@ struct AddBeanView: View {
             let lines = await BagOCR.recognize(from: draft.data)
             guard !lines.isEmpty else { continue }
             found = true
-            merged = mergeBags(merged, BagOCR.parse(lines, learned: learnedMap))
+            merged = mergeBags(merged, await BagParser.parse(lines, learned: learnedMap))
         }
         guard found else { scanNote = "No text found — try clearer, straight-on photos."; return }
 
@@ -270,6 +270,7 @@ struct AddBeanView: View {
             field = value; filled += 1
         }
         fill(&name, merged.name)
+        fill(&roaster, merged.roaster)
         fill(&country, merged.country)
         fill(&region, merged.region)
         fill(&farm, merged.farm)
@@ -294,6 +295,7 @@ struct AddBeanView: View {
     private func mergeBags(_ a: ParsedBag, _ b: ParsedBag) -> ParsedBag {
         var m = a
         m.name = a.name ?? b.name
+        m.roaster = a.roaster ?? b.roaster
         m.region = a.region ?? b.region
         m.farm = a.farm ?? b.farm
         m.process = a.process ?? b.process
@@ -407,16 +409,17 @@ struct AddBeanView: View {
 
     private func save() {
         let bean = editingBean ?? Bean()
-        bean.name = name.trimmingCharacters(in: .whitespaces)
+        // Normalize casing on save (except the roaster name — brands keep their own casing).
+        bean.name = name.trimmingCharacters(in: .whitespaces).normalizedTerm
         bean.roasterName = roaster.nilIfBlank
-        bean.country = country.nilIfBlank
-        bean.region = region.nilIfBlank
-        bean.farm = farm.nilIfBlank
-        bean.varietal = varietal.nilIfBlank
-        bean.process = process.nilIfBlank
-        bean.roastLevel = roastLevel.nilIfBlank
+        bean.country = country.nilIfBlank?.normalizedTerm
+        bean.region = region.nilIfBlank?.normalizedTerm
+        bean.farm = farm.nilIfBlank?.normalizedTerm
+        bean.varietal = varietal.nilIfBlank?.normalizedTerm
+        bean.process = process.nilIfBlank?.normalizedTerm
+        bean.roastLevel = roastLevel.nilIfBlank?.normalizedTerm
         bean.roastDate = hasRoastDate ? roastDate : nil
-        bean.roasterNotes = roasterNoteTags.isEmpty ? nil : roasterNoteTags.joined(separator: ", ")
+        bean.roasterNotes = roasterNoteTags.isEmpty ? nil : roasterNoteTags.normalizedTerms.joined(separator: ", ")
         bean.updatedAt = .now
         if editingBean == nil { context.insert(bean) }
         applyPhotos(to: bean)

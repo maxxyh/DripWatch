@@ -7,6 +7,9 @@ import ImageIO
 /// convenience that pre-fills the form; the user always reviews.
 struct ParsedBag {
     var name: String?
+    /// The roaster/brand. The heuristic parser leaves this nil (roaster is hard to place by rule);
+    /// the on-device model fills it. See `BagParser`.
+    var roaster: String?
     var country: String?
     var region: String?
     var farm: String?
@@ -71,7 +74,7 @@ enum BagOCR {
         var consumed = Set<Int>()
 
         let keys: [(tokens: [String], assign: (inout ParsedBag, String) -> Void)] = [
-            (["variety", "varietal"], { $0.varietal = $1 }),
+            (["variety", "varietal", "varieties"], { $0.varietal = $1 }),
             (["region", "zone"],      { $0.region = $1 }),
             (["farm", "producer"],    { $0.farm = $1 }),
             (["process", "processing"], { $0.process = $1 }),
@@ -82,6 +85,8 @@ enum BagOCR {
             let l = line.text.lowercased()
             let hasToken = keys.contains { $0.tokens.contains { l.contains($0) } }
                 || l.contains("roasted") || l.contains("altitude") || l.contains("taste")
+                || l.contains("tasting") || l.contains("origin")
+                || noteLabelPhrases.contains { l.contains($0) }
             guard hasToken else { return false }
             // A real label is a short column header ("VARIETY", "ROAST LEVEL") or an inline
             // "key: value" — not a descriptive line that merely mentions the word (a blend's
@@ -92,7 +97,12 @@ enum BagOCR {
         for (tokens, assign) in keys {
             guard let li = lines.firstIndex(where: { line in
                 let l = line.text.lowercased()
-                return tokens.contains { l.contains($0) }
+                // The token must START the line — a real label ("VARIETY: …", "PRODUCER | …"),
+                // not a word buried in a farm or blend name ("Finca Varietales", "Catuai varietal").
+                return tokens.contains { token in
+                    guard let r = l.range(of: token) else { return false }
+                    return l.distance(from: l.startIndex, to: r.lowerBound) <= 2
+                }
             }) else { continue }
             let label = lines[li]
 
@@ -106,7 +116,22 @@ enum BagOCR {
                           && abs($0.element.midY - label.midY) < band
                           && $0.element.box.minX > label.box.minX }
                 .min(by: { $0.element.box.minX < $1.element.box.minX })
-            if let cand = candidate { assign(&bag, cleanValue(cand.element.text)); consumed.insert(cand.offset) }
+            if let cand = candidate {
+                assign(&bag, cleanValue(cand.element.text)); consumed.insert(cand.offset); continue
+            }
+
+            // 3. Vertical layout: the value sits on the line directly *below* the label (many bags
+            //    stack "PRODUCER:" over "The Dharmawan Family"). Vision's y is bottom-up, so "below"
+            //    is a smaller midY; take the nearest such non-label line roughly under the label.
+            let gap = max(label.height, 0.02) * 3
+            let below = lines.enumerated()
+                .filter { !consumed.contains($0.offset) && !isLabelLine($0.element)
+                          && !isBoilerplate($0.element.text)
+                          && $0.element.midY < label.midY
+                          && (label.midY - $0.element.midY) < gap
+                          && abs($0.element.box.minX - label.box.minX) < 0.22 }
+                .max(by: { $0.element.midY < $1.element.midY })
+            if let b = below { assign(&bag, cleanValue(b.element.text)); consumed.insert(b.offset) }
         }
 
         // Fallback for an unlabeled process word printed on its own (e.g. "ANOXIC NATURAL").
@@ -118,13 +143,29 @@ enum BagOCR {
             }
         }
 
-        // Roaster's tasting notes: a "notes of …" phrase, possibly wrapping to the next line.
+        // Roaster's tasting notes: any common label phrasing ("tasting notes", "taste notes",
+        // "tastes like", "notes of"), with the value inline after the label and/or continuing on
+        // the following line(s). Notes wrap unpredictably, so we split on commas *and* periods
+        // (OCR often reads a "," as a "."), and only keep following lines that still look like
+        // notes — a separated list, or something the lexicon recognizes as a flavor.
         if bag.roasterNotes == nil,
-           let idx = lines.firstIndex(where: { $0.text.lowercased().contains("notes of") }) {
-            var note = lines[idx].text
-            if let range = note.lowercased().range(of: "notes of") { note = String(note[range.upperBound...]) }
-            if idx + 1 < lines.count, !isLabelLine(lines[idx + 1]) { note += " " + lines[idx + 1].text }
-            bag.roasterNotes = cleanValue(note)
+           let idx = lines.firstIndex(where: { line in
+               let l = line.text.lowercased()
+               return noteLabelPhrases.contains { l.contains($0) }
+           }) {
+            var collected: [String] = []
+            if let inline = valueAfterNoteLabel(lines[idx].text) { collected += splitNotes(inline) }
+            var j = idx + 1
+            while j < lines.count, collected.count < 10 {
+                let line = lines[j]
+                guard !isLabelLine(line), !isBoilerplate(line.text), !looksLikeCodeOrNumber(line.text) else { break }
+                let hasSeparator = line.text.contains { ",.;•·".contains($0) }
+                guard hasSeparator || CoffeeLexicon.hasTastingNote(line.text) else { break }
+                collected += splitNotes(line.text)
+                j += 1
+            }
+            let cleaned = collected.map(cleanValue).filter { $0.count > 1 }
+            if !cleaned.isEmpty { bag.roasterNotes = dedupeJoin(cleaned) }
         }
 
         // Name = the largest print that isn't a label, boilerplate, a process word, or a number.
@@ -132,7 +173,11 @@ enum BagOCR {
             .filter { !consumed.contains($0.offset) && !isLabelLine($0.element)
                       && !isBoilerplate($0.element.text)
                       && knownProcess($0.element.text.lowercased()) == nil
-                      && !isNumeric($0.element.text) }
+                      && !isNumeric($0.element.text)
+                      // A bare origin ("Colombia"), a flavor/farm line, or a lone metadata word
+                      // ("FILTER") is not the coffee's name.
+                      && !isOriginOrFlavorLine($0.element.text)
+                      && !isMetadataWord($0.element.text) }
             .max(by: { $0.element.height < $1.element.height })?
             .element.text
 
@@ -144,7 +189,7 @@ enum BagOCR {
         var noteParts: [String] = []
         for (i, line) in lines.enumerated() where !consumed.contains(i)
             && !isLabelLine(line) && !isBoilerplate(line.text) && line.text != bag.name {
-            for segment in line.text.split(separator: ",").map(String.init) {
+            for segment in line.text.split(whereSeparator: { ",|".contains($0) }).map(String.init) {
                 let (matches, unknowns) = CoffeeLexicon.classifySegment(segment, learned: learned)
                 for m in matches {
                     switch m.field {
@@ -164,7 +209,10 @@ enum BagOCR {
         }
         if bag.country == nil, !countryParts.isEmpty { bag.country = dedupeJoin(countryParts) }
         if bag.varietal == nil, !varietalParts.isEmpty { bag.varietal = dedupeJoin(varietalParts) }
-        if bag.roasterNotes == nil, !noteParts.isEmpty { bag.roasterNotes = dedupeJoin(noteParts) }
+        // Merge lexicon-detected flavors with any the label extractor already captured (a
+        // single-word note like "Candy" the extractor stopped at can still be picked up here).
+        let mergedNotes = (bag.roasterNotes.map(splitNotes) ?? []) + noteParts
+        if !mergedNotes.isEmpty { bag.roasterNotes = dedupeJoin(mergedNotes) }
 
         // De-duplicate unresolved, and drop anything we ended up filing into a field anyway.
         let filled = Set([bag.name, bag.country, bag.region, bag.farm, bag.varietal, bag.process,
@@ -188,7 +236,7 @@ enum BagOCR {
     // MARK: Helpers
 
     private static func valueAfterKey(_ line: String) -> String? {
-        for sep in [":", " - ", "–"] {
+        for sep in [":", " | ", "|", " - ", "–"] {
             if let range = line.range(of: sep) {
                 let v = line[range.upperBound...].trimmingCharacters(in: .whitespaces)
                 if !v.isEmpty { return cleanValue(v) }
@@ -197,17 +245,66 @@ enum BagOCR {
         return nil
     }
 
+    // MARK: Tasting-note helpers
+
+    private static let noteLabelPhrases = ["tasting notes", "taste notes", "tastes like", "notes of"]
+
+    /// The text after a notes label phrase on the same line ("TASTE NOTES: caramel, cocoa" → the
+    /// part after "notes"). Nil when the label stands alone.
+    private static func valueAfterNoteLabel(_ text: String) -> String? {
+        let lower = text.lowercased()
+        for phrase in noteLabelPhrases {
+            guard let range = lower.range(of: phrase) else { continue }
+            let offset = lower.distance(from: lower.startIndex, to: range.upperBound)
+            let after = text[text.index(text.startIndex, offsetBy: offset)...]
+            let value = after.trimmingCharacters(in: CharacterSet(charactersIn: " :.-–"))
+            return value.isEmpty ? nil : value
+        }
+        return nil
+    }
+
+    /// Split a note line into individual notes on commas or periods (OCR frequently reads a
+    /// separating "," as a "."), plus a couple of other bullet separators.
+    private static func splitNotes(_ text: String) -> [String] {
+        text.split(whereSeparator: { ",.;•·|".contains($0) })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// A line that's clearly not a tasting note — a weight/altitude/price code, or a "(18:210)"
+    /// style stamp — so note collection stops before it.
+    private static func looksLikeCodeOrNumber(_ text: String) -> Bool {
+        text.contains("(") || text.contains(")") || text.filter(\.isNumber).count >= 2
+    }
+
     private static func knownProcess(_ lower: String) -> String? {
-        ["anaerobic natural", "anoxic natural", "carbonic maceration",
+        ["anaerobic natural", "natural anaerobic", "anoxic natural", "carbonic maceration",
          "washed", "natural", "honey", "anaerobic", "anoxic"].first { lower.contains($0) }?.capitalized
+    }
+
+    /// A line that classifies as a bare origin, a flavor, or a farm/producer — never the coffee's
+    /// name (a "Finca …" line is the farm, and its notes get split out by the content pass).
+    private static func isOriginOrFlavorLine(_ text: String) -> Bool {
+        let field = CoffeeLexicon.classifySegment(text).matches.first?.field
+        return field == .country || field == .tastingNote || field == .farm
+    }
+
+    /// A line made up only of brew-method / qualifier words ("FILTER", "ESPRESSO", "BLEND") —
+    /// metadata printed on the bag, never the coffee's name.
+    private static func isMetadataWord(_ text: String) -> Bool {
+        let tokens = text.lowercased().split { !$0.isLetter }.map(String.init)
+        return !tokens.isEmpty && tokens.allSatisfy { CoffeeLexicon.noise.contains($0) }
     }
 
     /// Country / competition / marketing lines that shouldn't be taken as the coffee's name.
     private static func isBoilerplate(_ text: String) -> Bool {
         let l = text.lowercased()
-        let junk = ["specialty", "coffee", "roaster", "top ", "vncp", "net wt", "whole bean",
+        let junk = ["specialty", "roaster", "top ", "vncp", "net wt", "whole bean",
                     "việt nam", "viet nam", "with notes", "tastes like", "bright acidity",
                     "masl", "m.a.s.l", "altitude"]
+        // "coffee" marks a roaster tagline ("… Coffee Roasters") only in a longer phrase — a short
+        // two-word product name like "Alo Coffee" is fine to keep.
+        if l.contains("coffee"), text.split(separator: " ").count > 2 { return true }
         // A coffee name never starts with a digit (that's an altitude / weight / price line).
         return junk.contains { l.contains($0) } || text.count <= 2 || (text.first?.isNumber ?? false)
     }

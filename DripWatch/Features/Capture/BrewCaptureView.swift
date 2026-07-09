@@ -34,6 +34,9 @@ struct BrewCaptureView: View {
     @State private var showNext = false
     @State private var planNext: Bool
     @State private var nextDraft: Recipe
+    /// True once `nextDraft` reflects a real starting point (the brewed recipe, or a loaded
+    /// draft). Until then, opening the plan pre-fills it from what you actually brewed.
+    @State private var nextDraftSeeded: Bool
 
     // Optional result photo (latte art, crema, the cup).
     @State private var photoData: Data?
@@ -56,6 +59,7 @@ struct BrewCaptureView: View {
             _taste = State(initialValue: editing.taste)
             _planNext = State(initialValue: editing.nextRecipeDraft != nil)
             _nextDraft = State(initialValue: editing.nextRecipeDraft ?? editing.recipe)
+            _nextDraftSeeded = State(initialValue: true)
             _photoData = State(initialValue: editing.photo)
             _committed = State(initialValue: true)
             _liveBrew = State(initialValue: editing)
@@ -65,9 +69,13 @@ struct BrewCaptureView: View {
             _brewedAt = State(initialValue: .now)
             _recipe = State(initialValue: seed)
             _taste = State(initialValue: Taste())
-            let pending = bean.pendingNextRecipe(for: method)
-            _planNext = State(initialValue: pending != nil)
-            _nextDraft = State(initialValue: pending ?? seed)
+            // A fresh brew starts with NO next-brew plan. Any pending plan already seeded THIS
+            // brew's recipe above and is consumed on commit — carrying it forward would leave
+            // every brew pointing a "next plan" at itself. The plan is drafted deliberately while
+            // tasting, and pre-fills from what you actually brewed (see `planNext` onChange).
+            _planNext = State(initialValue: false)
+            _nextDraft = State(initialValue: seed)
+            _nextDraftSeeded = State(initialValue: false)
             _committed = State(initialValue: false)
             _liveBrew = State(initialValue: nil)
         }
@@ -124,8 +132,13 @@ struct BrewCaptureView: View {
             .onChange(of: recipe) { _, _ in edited = true; persist() }
             .onChange(of: taste) { _, _ in edited = true; persist() }
             .onChange(of: brewedAt) { _, _ in edited = true; persist() }
-            .onChange(of: planNext) { _, _ in edited = true; persist() }
-            .onChange(of: nextDraft) { _, _ in edited = true; persist() }
+            .onChange(of: planNext) { _, on in
+                // Opening the plan for the first time pre-fills it with everything you just
+                // brewed, so you change only what you want rather than starting from blank.
+                if on, !nextDraftSeeded { nextDraft = recipe; nextDraftSeeded = true }
+                edited = true; persist()
+            }
+            .onChange(of: nextDraft) { _, _ in nextDraftSeeded = true; edited = true; persist() }
             .onChange(of: photoData) { _, _ in edited = true; persist() }
             #if DEBUG
             .task {
@@ -256,6 +269,15 @@ struct BrewCaptureView: View {
     private var brewingPhase: some View {
         VStack(spacing: 16) {
             brewingReference
+            // The one number you sit and watch for while brewing — first-class, with a live
+            // stopwatch, so you never have to dig into "Adjust recipe" to record it. Pourover
+            // times the drawdown; espresso times the shot.
+            BrewTimerField(
+                label: method == .pourover ? "Total drawdown" : "Shot time",
+                systemImage: method == .pourover ? "hourglass" : "timer",
+                seconds: method == .pourover ? $recipe.totalDrawdownSec : $recipe.shotTimeSec
+            )
+            .dripCard()
             DisclosureGroup {
                 RecipeEditor(recipe: $recipe, method: method).padding(.top, 8)
             } label: {
@@ -270,8 +292,29 @@ struct BrewCaptureView: View {
     private var tastePhase: some View {
         VStack(spacing: 16) {
             tasteCard
+            if !priorTasteBrews.isEmpty {
+                PreviousNotesView(brews: priorTasteBrews,
+                                  onAdd: { term, positive in addTasteTerm(term, positive: positive) })
+            }
             photoCard
             nextCard
+        }
+    }
+
+    /// Recent brews of this method that carry tasting notes — the memory you reach for while
+    /// deciding how this cup tastes ("last time it was sour"). Excludes the brew being logged.
+    private var priorTasteBrews: [Brew] {
+        Array(bean.timeline
+            .filter { $0.method == method && $0.id != liveBrew?.id && !$0.taste.isEmpty }
+            .prefix(3))
+    }
+
+    /// Reuse a previous tasting term with one tap.
+    private func addTasteTerm(_ term: String, positive: Bool) {
+        if positive {
+            if !taste.positives.contains(term) { taste.positives.append(term); Haptics.select() }
+        } else {
+            if !taste.negatives.contains(term) { taste.negatives.append(term); Haptics.select() }
         }
     }
 
@@ -562,8 +605,22 @@ struct BrewCaptureView: View {
                 Toggle("Plan a change for next time", isOn: $planNext.animation())
                     .font(.subheadline).tint(Theme.accent)
                 if planNext {
-                    Text("This becomes the starting point for the next brew.")
+                    Text("Pre-filled with what you just brewed — change only what you want. This seeds your next brew.")
                         .font(.caption).foregroundStyle(.secondary)
+                    // Highlight the delta vs. this brew, so the plan reads as "what I'm changing".
+                    let planChanges = BrewDiff.changes(from: recipe, to: nextDraft)
+                    if planChanges.isEmpty {
+                        Text("No changes yet — tweak a value below.")
+                            .font(.caption).foregroundStyle(.tertiary)
+                    } else {
+                        WrapLayout(spacing: 6, lineSpacing: 6) {
+                            ForEach(planChanges, id: \.self) {
+                                Chip(text: $0, symbol: "arrow.right", tint: Theme.accent)
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Planned changes: \(planChanges.joined(separator: ", "))")
+                    }
                     RecipeEditor(recipe: $nextDraft, method: method)
                 }
             }
@@ -646,9 +703,164 @@ struct ChipField: View {
     }
 
     private func add() {
-        guard let v = entry.nilIfBlank else { return }
-        if !items.contains(v) { items.append(v); Haptics.select() }
+        guard let v = entry.nilIfBlank?.normalizedTerm else { return }
+        if !items.contains(where: { $0.caseInsensitiveCompare(v) == .orderedSame }) {
+            items.append(v); Haptics.select()
+        }
         entry = ""
+    }
+}
+
+// MARK: - Brewing observations
+
+/// A first-class, in-the-moment time capture for the number you sit and watch during a brew —
+/// drawdown for pourover, shot time for espresso. A live stopwatch (tap Start when it begins,
+/// Stop when it finishes) writes the seconds; the value also stays tappable so you can type it
+/// straight in (digits only — "230" → 2:30). No digging into "Adjust recipe" for it.
+struct BrewTimerField: View {
+    let label: String
+    let systemImage: String
+    @Binding var seconds: Int?
+
+    @State private var running = false
+    @State private var startDate = Date.now
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Label(label, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+
+            if running {
+                TimelineView(.periodic(from: .now, by: 0.1)) { context in
+                    Text(timeText(elapsed(at: context.date)))
+                        .font(.param(.title, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .monospacedDigit()
+                }
+            } else {
+                TextField("—", text: $text)
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+                    .focused($focused)
+                    .font(.param(.title, weight: .semibold))
+                    .frame(maxWidth: 92)
+                    .onChange(of: text) { _, newValue in
+                        let (formatted, secs) = liveTimeEntry(newValue)
+                        if formatted != newValue { text = formatted }
+                        seconds = secs
+                    }
+                    .onChange(of: seconds) { _, v in if !focused { text = v.map { timeText($0) } ?? "" } }
+                    .onAppear { text = seconds.map { timeText($0) } ?? "" }
+                    .accessibilityLabel(label)
+                    .accessibilityValue(seconds.map { timeText($0) } ?? "not set")
+            }
+
+            // Prominent when running (accent fill, contrast handled by the button style — no
+            // hardcoded appearance), quiet otherwise.
+            Button(action: toggle) {
+                Image(systemName: running ? "stop.fill" : "play.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 28, height: 26)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .tint(running ? Theme.accent : Color.secondary)
+            .accessibilityLabel(running ? "Stop timing \(label)" : "Start timing \(label)")
+        }
+        // Advancing the phase (or dismissing) while the stopwatch is still running would tear
+        // this view down and drop the elapsed time — the one number you're timing. Capture it.
+        .onDisappear {
+            if running { seconds = elapsed(at: .now); running = false }
+        }
+    }
+
+    private func elapsed(at date: Date) -> Int {
+        max(0, Int(date.timeIntervalSince(startDate).rounded()))
+    }
+
+    private func toggle() {
+        if running {
+            seconds = elapsed(at: .now)
+            running = false
+            Haptics.success()
+        } else {
+            focused = false
+            startDate = .now
+            running = true
+            Haptics.tap()
+        }
+    }
+}
+
+// MARK: - Previous tasting notes
+
+/// While logging how this cup tastes, the last few brews' tasting notes for the same bean —
+/// the memory you're implicitly comparing against. Positive/negative terms are tappable to
+/// reuse in the current taste with one tap.
+struct PreviousNotesView: View {
+    let brews: [Brew]   // newest first, non-empty taste
+    var onAdd: (_ term: String, _ positive: Bool) -> Void
+    @State private var expanded = false
+
+    private var visible: [Brew] { expanded ? brews : Array(brews.prefix(1)) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Previous notes", systemImage: "clock.arrow.circlepath").font(.headline)
+                Spacer()
+                Text("tap a term to reuse").font(.caption2).foregroundStyle(.tertiary)
+            }
+            ForEach(visible, id: \.id) { brew in
+                brewNote(brew)
+                if brew.id != visible.last?.id {
+                    Divider().overlay(Theme.crema.opacity(0.3))
+                }
+            }
+            if brews.count > 1 {
+                Button {
+                    Haptics.tap(); withAnimation { expanded.toggle() }
+                } label: {
+                    Text(expanded ? "Show less" : "Show \(brews.count - 1) more")
+                        .font(.caption.weight(.medium)).foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .dripCard()
+    }
+
+    @ViewBuilder private func brewNote(_ brew: Brew) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(brew.brewedAt.formatted(date: .abbreviated, time: .omitted))
+                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            if !brew.taste.positives.isEmpty || !brew.taste.negatives.isEmpty {
+                WrapLayout(spacing: 6, lineSpacing: 6) {
+                    ForEach(brew.taste.positives, id: \.self) { term in
+                        termButton(term, symbol: "plus", tint: Theme.sage, positive: true)
+                    }
+                    ForEach(brew.taste.negatives, id: \.self) { term in
+                        termButton(term, symbol: "minus", tint: Theme.clay, positive: false)
+                    }
+                }
+            }
+            if let note = brew.taste.note, !note.isEmpty {
+                Text("“\(note)”").font(.footnote.italic()).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func termButton(_ term: String, symbol: String, tint: Color, positive: Bool) -> some View {
+        Button {
+            onAdd(term, positive)
+        } label: {
+            Chip(text: term, symbol: symbol, tint: tint).hitTarget(32)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(term), \(positive ? "good" : "bad"). Tap to reuse.")
     }
 }
 
