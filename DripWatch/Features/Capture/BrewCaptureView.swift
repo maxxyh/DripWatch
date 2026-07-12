@@ -270,14 +270,22 @@ struct BrewCaptureView: View {
     private var brewingPhase: some View {
         VStack(spacing: 16) {
             brewingReference
-            // The one number you sit and watch for while brewing — first-class, with a live
-            // stopwatch, so you never have to dig into "Adjust recipe" to record it. Pourover
-            // times the drawdown; espresso times the shot.
-            BrewTimerField(
-                label: method == .pourover ? "Total drawdown" : "Shot time",
-                systemImage: method == .pourover ? "hourglass" : "timer",
-                seconds: method == .pourover ? $recipe.totalDrawdownSec : $recipe.shotTimeSec
-            )
+            // The numbers you sit and watch for while brewing — first-class, so you never have
+            // to dig into "Adjust recipe" to record them. Pourover times the drawdown; espresso
+            // times the shot and, since the yield tends to drift from whatever was planned,
+            // also gets its weight recorded here as it settles in the cup (a live stopwatch for
+            // time; weight is just typed once it's in).
+            VStack(spacing: 12) {
+                if method == .espresso {
+                    BrewWeightField(label: "Shot weight", systemImage: "cup.and.saucer", grams: $recipe.yieldGrams)
+                    Divider().overlay(Theme.crema.opacity(0.3))
+                }
+                BrewTimerField(
+                    label: method == .pourover ? "Total drawdown" : "Shot time",
+                    systemImage: method == .pourover ? "hourglass" : "timer",
+                    seconds: method == .pourover ? $recipe.totalDrawdownSec : $recipe.shotTimeSec
+                )
+            }
             .dripCard()
             DisclosureGroup {
                 RecipeEditor(recipe: $recipe, method: method).padding(.top, 8)
@@ -792,6 +800,34 @@ struct BrewTimerField: View {
             startDate = .now
             running = true
             Haptics.tap()
+        }
+    }
+}
+
+/// A first-class, in-the-moment weight capture for a number that keeps drifting from plan —
+/// the espresso shot's weight in the cup. Unlike shot time there's nothing to start/stop, so
+/// it's just a big tappable field: glance at the scale as the shot finishes and type it in.
+struct BrewWeightField: View {
+    let label: String
+    let systemImage: String
+    @Binding var grams: Double?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Label(label, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            HStack(spacing: 2) {
+                TextField("—", value: $grams, format: .number.precision(.fractionLength(0...1)))
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .font(.param(.title, weight: .semibold))
+                    .frame(maxWidth: 92)
+                Text("g").font(.title3).foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(label)
+            .accessibilityValue(grams.map { "\(gramText($0)) grams" } ?? "not set")
         }
     }
 }
