@@ -395,13 +395,15 @@ func liveTimeEntry(_ raw: String) -> (text: String, seconds: Int?) {
 
 /// Editable per-pour list, driven by the pour *count* so you don't add rows one-by-one: set
 /// "Pours" to 4 and four rows appear. Cumulative water targets are suggested and **re-flow to a
-/// clean ramp whenever you change the count** (add/remove a pour), so you never end up with a
-/// stale middle and an empty last row. A seeded recipe's existing weights are preserved on load.
+/// clean ramp whenever the count changes, or whenever the total water changes** (dose, ratio, or
+/// an explicit total), so you never end up with a stale middle and an empty last row. A seeded
+/// recipe's existing weights are preserved on load.
 /// Timings are off by default — reveal them only when you actually have a schedule to follow, so
 /// the app never invents times you'd have to delete.
 private struct PourBreakdown: View {
     @Binding var recipe: Recipe
     @State private var syncedCount: Int?
+    @State private var syncedTotal: Double?
     @State private var showTimes: Bool
 
     init(recipe: Binding<Recipe>) {
@@ -440,8 +442,16 @@ private struct PourBreakdown: View {
             }
             .font(.subheadline).buttonStyle(.plain).foregroundStyle(Theme.accent)
         }
-        .onAppear { syncToCount() }
+        .onAppear {
+            syncToCount()
+            syncedTotal = recipe.effectiveWaterGrams
+        }
         .onChange(of: recipe.pourCount) { _, _ in syncToCount() }
+        .onChange(of: recipe.effectiveWaterGrams) { _, newTotal in
+            defer { syncedTotal = newTotal }
+            guard newTotal != syncedTotal, !recipe.pours.isEmpty else { return }
+            applySuggestedWeights()
+        }
     }
 
     /// Match the row count to `pourCount`, then decide on weights: on first layout keep whatever
