@@ -12,6 +12,15 @@ struct RecipeEditor: View {
     var method: BrewMethod = .pourover
     @State private var showBreakdown = false
 
+    // Tracks the pour-breakdown's last-known pour count / total water so the breakdown can be
+    // kept in step with them. Deliberately owned here rather than inside the collapsible
+    // "Pour-by-pour breakdown" section: the "Pours" and "Ratio" fields that drive these values
+    // are always visible, so the sync has to be too — otherwise changing them while the
+    // breakdown has never been opened leaves `recipe.pours` holding stale rows/weights from
+    // whatever seeded this recipe (e.g. the previous brew).
+    @State private var syncedPourCount: Int?
+    @State private var syncedWaterTotal: Double?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             GrindPicker(grind: $recipe.grind)
@@ -24,6 +33,36 @@ struct RecipeEditor: View {
                 pouroverFields
             }
         }
+        .onAppear { syncPourBreakdown() }
+        .onChange(of: recipe.pourCount) { _, _ in syncPourBreakdown() }
+        .onChange(of: recipe.effectiveWaterGrams) { _, _ in syncPourBreakdown() }
+    }
+
+    /// Keeps `recipe.pours` matched to `recipe.pourCount` and, when the count or the effective
+    /// total water has actually changed since we last looked, re-flows every row to a fresh
+    /// suggested ramp. On first appearance a seeded recipe's existing weights are left alone
+    /// (only a fully-blank set gets suggested values) — see `PourBreakdown`'s doc comment for why.
+    private func syncPourBreakdown() {
+        guard method == .pourover, let rawCount = recipe.pourCount, rawCount >= 0 else { return }
+        // Defensive cap: `pourCount` can pass through a large value transiently while being
+        // typed (e.g. "150" walks through 1, 15, 150 one digit at a time) — never size the pour
+        // array off that.
+        let target = min(rawCount, Recipe.pourCountRange.upperBound)
+        let newTotal = recipe.effectiveWaterGrams
+        let firstLayout = syncedPourCount == nil
+        let countChanged = !firstLayout && target != syncedPourCount
+        let totalChanged = !firstLayout && newTotal != syncedWaterTotal
+
+        if recipe.pours.count != target { recipe.reflowPourCount(to: target) }
+
+        if firstLayout {
+            if recipe.pours.allSatisfy({ $0.toGrams == nil }) { recipe.reflowPourWeights() }
+        } else if countChanged || (totalChanged && !recipe.pours.isEmpty) {
+            recipe.reflowPourWeights()
+        }
+
+        syncedPourCount = target
+        syncedWaterTotal = newTotal
     }
 
     // MARK: Pourover
@@ -31,12 +70,20 @@ struct RecipeEditor: View {
     @ViewBuilder private var pouroverFields: some View {
         NumberField(label: "Temp", unit: "°C", value: $recipe.waterTempC, range: 60...100, systemImage: "thermometer.medium", step: 1, stepDefault: 92)
         DecimalField(label: "Dose", unit: "g", value: $recipe.doseGrams, systemImage: "scalemass", step: 0.5, stepDefault: 15, range: 0...100, presets: [15, 20])
-        RatioField(ratio: $recipe.ratio)
-        NumberField(label: "Pours", unit: "", value: $recipe.pourCount, range: 1...12, systemImage: "drop", step: 1, stepDefault: 3)
-        TimeInputField(label: "Bloom", seconds: $recipe.bloomTimeSec, systemImage: "timer")
-        TimeInputField(label: "Drawdown (TDD)", seconds: $recipe.totalDrawdownSec, systemImage: "hourglass")
+            // A total water typed before a dose was set is stuck as an explicit override
+            // (nothing to divide it by yet) — fold it into the ratio the moment a dose appears,
+            // so it goes back to tracking future ratio/dose edits instead of staying pinned.
+            .onChange(of: recipe.doseGrams) { _, _ in recipe.reconcileTotalWaterWithDose() }
 
-        // Progressive: everything below is optional detail.
+        // Ratio, total water, pour count, and the breakdown below are one interlocking group —
+        // editing any of the first three keeps the others (and every row's suggested weight) in
+        // step, and the breakdown is just that group's detail view, not a separate concern.
+        RatioField(ratio: $recipe.ratio)
+        DecimalField(label: "Total water", unit: "g", value: Binding(
+            get: { recipe.effectiveWaterGrams },
+            set: { recipe.setTotalWater($0) }
+        ), systemImage: "drop.triangle", step: 5, stepDefault: 225, range: 0...2000)
+        NumberField(label: "Pours", unit: "", value: $recipe.pourCount, range: Recipe.pourCountRange, systemImage: "drop", step: 1, stepDefault: 3)
         DisclosureGroup(isExpanded: $showBreakdown) {
             VStack(alignment: .leading, spacing: 12) {
                 PourBreakdown(recipe: $recipe)
@@ -51,10 +98,13 @@ struct RecipeEditor: View {
             }
             .padding(.top, 8)
         } label: {
-            Label("Pour-by-pour breakdown", systemImage: "list.number")
+            Label("Pour breakdown", systemImage: "list.number")
                 .font(.subheadline.weight(.medium))
         }
         .tint(Theme.accent)
+
+        TimeInputField(label: "Bloom", seconds: $recipe.bloomTimeSec, systemImage: "timer")
+        TimeInputField(label: "Drawdown (TDD)", seconds: $recipe.totalDrawdownSec, systemImage: "hourglass")
     }
 
     // MARK: Espresso
@@ -113,13 +163,14 @@ struct RecipeEditor: View {
 struct StepperCluster<Content: View>: View {
     let onMinus: () -> Void
     let onPlus: () -> Void
+    var contentWidth: CGFloat = 74
     @ViewBuilder var content: Content
 
     var body: some View {
         HStack(spacing: 0) {
             button("minus", onMinus)
             divider
-            content.frame(width: 74).frame(maxHeight: .infinity)
+            content.frame(width: contentWidth).frame(maxHeight: .infinity)
             divider
             button("plus", onPlus)
         }
@@ -193,7 +244,12 @@ private struct NumberField: View {
             TextField("—", value: $value, format: .number)
                 .keyboardType(.numberPad).multilineTextAlignment(.center)
                 .focused($focused).font(.param(.body, weight: .semibold))
-                .onChange(of: focused) { _, isFocused in if !isFocused { clamp() } }
+                // Clamp as digits land, not just on blur — an in-range field can otherwise pass
+                // through a wildly out-of-range value mid-keystroke (typing "150" walks through
+                // 1, 15, 150) and, when this field drives something that sizes an array from its
+                // value (the pour-breakdown row count), that transient value can trigger a large,
+                // wasted rebuild before the field ever loses focus to clamp it back down.
+                .onChange(of: value) { _, _ in clamp() }
             if !unit.isEmpty { Text(unit).font(.caption).foregroundStyle(.secondary) }
         }
     }
@@ -299,13 +355,19 @@ private struct RatioField: View {
         HStack(spacing: 8) {
             Label("Ratio", systemImage: "divide").font(.subheadline).foregroundStyle(.secondary)
             Spacer(minLength: 8)
-            StepperCluster(onMinus: { bump(-1) }, onPlus: { bump(1) }) {
+            // Wider than the default stepper slot: even a single 0.5 bump off a whole number
+            // (15 → 15.5) needs more than the default 74pt affords once "1:" shares the space —
+            // a dose-derived ratio (14.67) needs still more, or it clips.
+            StepperCluster(onMinus: { bump(-1) }, onPlus: { bump(1) }, contentWidth: 92) {
                 HStack(spacing: 1) {
                     Text("1:").font(.param(.body, weight: .semibold)).foregroundStyle(.secondary)
-                    TextField("—", value: $ratio, format: .number.precision(.fractionLength(0...1)))
+                    // 2 decimal places, not 1: a ratio derived from a typed total water ÷ dose
+                    // (e.g. 220g ÷ 15g = 14.6667) needs more than one digit of precision to round-
+                    // trip through this field without silently losing accuracy on the next edit.
+                    TextField("—", value: $ratio, format: .number.precision(.fractionLength(0...2)))
                         .keyboardType(.decimalPad).multilineTextAlignment(.leading)
                         .font(.param(.body, weight: .semibold))
-                        .frame(width: 30)
+                        .frame(width: 58)
                 }
             }
         }
@@ -393,17 +455,26 @@ func liveTimeEntry(_ raw: String) -> (text: String, seconds: Int?) {
     return (seconds.map { timeText($0) } ?? "", seconds)
 }
 
-/// Editable per-pour list, driven by the pour *count* so you don't add rows one-by-one: set
-/// "Pours" to 4 and four rows appear. Cumulative water targets are suggested and **re-flow to a
-/// clean ramp whenever the count changes, or whenever the total water changes** (dose, ratio, or
-/// an explicit total), so you never end up with a stale middle and an empty last row. A seeded
-/// recipe's existing weights are preserved on load.
+/// A read-out of the pour ramp implied by ratio/total water/pour count, one row per pour.
+/// Row count is driven *only* by the "Pours" field above — there's no per-row add/remove here,
+/// so the breakdown can't disagree with that field about how many rows there should be. Interior
+/// rows are freely editable for pacing (a deliberate, non-default target). The **last row is a
+/// live view of total water itself** — editing it calls the same `setTotalWater` the "Total
+/// water" field above uses, so typing a precise final pour target re-derives the ratio exactly
+/// like typing into that field would.
+///
+/// This view only *displays* the breakdown — the actual sync (matching row count to
+/// `recipe.pourCount`, re-flowing weights when the count or total water changes) is driven by
+/// `RecipeEditor.syncPourBreakdown()`, which lives one level up, at the always-visible part of
+/// the editor. It has to: the "Pours"/"Ratio"/"Total water" fields that change those values sit
+/// outside this collapsible section, so if the sync lived only in here, editing them while this
+/// section had never been opened would leave `recipe.pours` stuck holding whatever rows/weights
+/// this recipe was seeded with.
+///
 /// Timings are off by default — reveal them only when you actually have a schedule to follow, so
 /// the app never invents times you'd have to delete.
 private struct PourBreakdown: View {
     @Binding var recipe: Recipe
-    @State private var syncedCount: Int?
-    @State private var syncedTotal: Double?
     @State private var showTimes: Bool
 
     init(recipe: Binding<Recipe>) {
@@ -416,7 +487,7 @@ private struct PourBreakdown: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if recipe.pours.isEmpty {
-                Text("Set a pour count above to lay out the pours, or add one below.")
+                Text("Set a pour count above to lay out the pours.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 Toggle(isOn: $showTimes.animation()) {
@@ -430,74 +501,33 @@ private struct PourBreakdown: View {
                     Text("to (g)")
                 }
                 .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                ForEach(recipe.pours.indices, id: \.self) { index in
+                    PourRow(
+                        pour: $recipe.pours[index],
+                        showTimes: showTimes,
+                        isLastPour: index == recipe.pours.count - 1,
+                        totalWater: Binding(
+                            get: { recipe.effectiveWaterGrams },
+                            set: { recipe.setTotalWater($0) }
+                        )
+                    )
+                }
             }
-            ForEach($recipe.pours) { $pour in
-                PourRow(pour: $pour, showTimes: showTimes) { remove(pour) }
-            }
-            Button {
-                Haptics.tap()
-                recipe.pourCount = (recipe.pourCount ?? recipe.pours.count) + 1
-            } label: {
-                Label("Add pour", systemImage: "plus.circle")
-            }
-            .font(.subheadline).buttonStyle(.plain).foregroundStyle(Theme.accent)
         }
-        .onAppear {
-            syncToCount()
-            syncedTotal = recipe.effectiveWaterGrams
-        }
-        .onChange(of: recipe.pourCount) { _, _ in syncToCount() }
-        .onChange(of: recipe.effectiveWaterGrams) { _, newTotal in
-            defer { syncedTotal = newTotal }
-            guard newTotal != syncedTotal, !recipe.pours.isEmpty else { return }
-            applySuggestedWeights()
-        }
-    }
-
-    /// Match the row count to `pourCount`, then decide on weights: on first layout keep whatever
-    /// a seeded recipe brought (only suggest into a fully-blank set); on any later count change,
-    /// re-flow the whole cumulative ramp so add/remove always leaves a sensible, complete set.
-    private func syncToCount() {
-        guard let target = recipe.pourCount, target >= 0 else { return }
-        if recipe.pours.count < target {
-            for i in recipe.pours.count..<target { recipe.pours.append(Pour(order: i + 1)) }
-        } else if recipe.pours.count > target {
-            recipe.pours = Array(recipe.pours.prefix(target))
-        }
-        reorder()
-
-        if syncedCount == nil {
-            if recipe.pours.allSatisfy({ $0.toGrams == nil }) { applySuggestedWeights() }
-        } else if target != syncedCount {
-            applySuggestedWeights()
-        }
-        syncedCount = target
-    }
-
-    private func applySuggestedWeights() {
-        let targets = recipe.suggestedCumulativeTargets(count: recipe.pours.count)
-        guard targets.count == recipe.pours.count else { return }
-        for i in recipe.pours.indices { recipe.pours[i].toGrams = targets[i] }
-    }
-
-    private func remove(_ pour: Pour) {
-        Haptics.tap()
-        recipe.pours.removeAll { $0.id == pour.id }
-        reorder()
-        recipe.pourCount = recipe.pours.isEmpty ? nil : recipe.pours.count
-    }
-
-    private func reorder() {
-        for i in recipe.pours.indices { recipe.pours[i].order = i + 1 }
     }
 }
 
 /// One editable pour: cumulative target (+ optional time window) on the first line, style/note
 /// below. Time cells appear only when the breakdown's "Add pour timings" toggle is on.
+///
+/// The last pour's gram field edits `totalWater` (i.e. `recipe.setTotalWater`) rather than its
+/// own `toGrams` directly — it *is* total water, not a separate number that happens to match it,
+/// so it's shown in the accent color to read as linked to the Ratio/Total water fields above.
 private struct PourRow: View {
     @Binding var pour: Pour
     var showTimes: Bool
-    var onRemove: () -> Void
+    var isLastPour: Bool
+    var totalWater: Binding<Double?>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -509,15 +539,20 @@ private struct PourRow: View {
                     PourTimeField(placeholder: "end", seconds: $pour.endSec)
                 }
                 Spacer(minLength: 4)
-                TextField("g", value: $pour.toGrams, format: .number.precision(.fractionLength(0...0)))
-                    .keyboardType(.numberPad).multilineTextAlignment(.trailing)
-                    .frame(width: 46).font(.param(.subheadline))
-                Text("g").font(.caption).foregroundStyle(.secondary)
-                Button(role: .destructive, action: onRemove) {
-                    Image(systemName: "minus.circle.fill").hitTarget(32)
+                if isLastPour {
+                    // Wider than the other rows: this one shows the exact, unrounded total (see
+                    // the type-level doc comment above) — "247.5" needs more room than a plain
+                    // integer like the interior rows' "999" does, or it clips.
+                    TextField("g", value: totalWater, format: .number.precision(.fractionLength(0...1)))
+                        .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                        .frame(width: 64).font(.param(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                } else {
+                    TextField("g", value: $pour.toGrams, format: .number.precision(.fractionLength(0...0)))
+                        .keyboardType(.numberPad).multilineTextAlignment(.trailing)
+                        .frame(width: 46).font(.param(.subheadline))
                 }
-                .buttonStyle(.plain).foregroundStyle(.secondary)
-                .accessibilityLabel("Remove pour \(pour.order)")
+                Text("g").font(.caption).foregroundStyle(.secondary)
             }
             TextField("style / note (centre, aggressive…)",
                       text: Binding(get: { pour.style ?? "" }, set: { pour.style = $0.nilIfBlank }))

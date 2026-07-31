@@ -51,8 +51,14 @@ struct Recipe: Codable, Hashable {
 
     var waterTempC: Int?
     var doseGrams: Double?
-    /// Ratio as the denominator, e.g. `15` means 1:15.
+    /// Ratio as the denominator, e.g. `15` means 1:15. Not restricted to a round grid — the
+    /// +/- stepper nudges in 0.5s for convenience, but a value derived from a typed total water
+    /// (e.g. 220g ÷ 15g = 14.666…) is stored at full precision so total water stays exact.
     var ratio: Double?
+    /// An explicit total water override, used only when there's no dose to divide by (so a total
+    /// can still be typed before the dose is known). Once a dose exists, total water is always
+    /// derived as `dose × ratio` — see `setTotalWater` / `reconcileTotalWaterWithDose` — so this
+    /// never becomes a second, silently-stale source of truth that stops reacting to ratio edits.
     var totalWaterGrams: Double?
     var pourCount: Int?
     var bloomTimeSec: Int?
@@ -113,10 +119,71 @@ struct Recipe: Codable, Hashable {
         return nil
     }
 
+    /// The number of pours a fresh breakdown should have, and the ceiling any pour-count value
+    /// is capped to before it's used to size `pours`. Matches the "Pours" field's stepper range —
+    /// shared so a value that reaches the model some other way (a typed value mid-keystroke, an
+    /// imported/synced recipe) can never blow the per-pour array out to an unreasonable size.
+    static let pourCountRange = 1...12
+
+    /// Sets the *total* water directly (e.g. typed into a "Total water" field), keeping it and
+    /// `ratio` bidirectionally in sync. When a dose is known, the total is folded straight into
+    /// the ratio and no separate total is stored — so the two fields always describe the same
+    /// number instead of one silently going stale when the other changes. Without a dose there's
+    /// nothing to divide by, so the total is kept as an explicit override until one appears (see
+    /// `reconcileTotalWaterWithDose`).
+    mutating func setTotalWater(_ grams: Double?) {
+        guard let grams, grams > 0 else {
+            if let dose = doseGrams, dose > 0 { ratio = nil } else { totalWaterGrams = nil }
+            return
+        }
+        if let dose = doseGrams, dose > 0 {
+            ratio = grams / dose
+            totalWaterGrams = nil
+        } else {
+            totalWaterGrams = grams
+        }
+    }
+
+    /// Folds a standalone total-water override into the ratio the moment a dose becomes known.
+    /// Call this when `doseGrams` changes — without it, a total typed before the dose was set
+    /// would stay pinned at that value forever (since `effectiveWaterGrams` prefers an explicit
+    /// `totalWaterGrams` over `dose × ratio`), silently ignoring every later ratio edit.
+    mutating func reconcileTotalWaterWithDose() {
+        guard let dose = doseGrams, dose > 0, let total = totalWaterGrams else { return }
+        ratio = total / dose
+        totalWaterGrams = nil
+    }
+
+    /// Grows or shrinks `pours` to exactly `count` rows (renumbering `order` to match), without
+    /// touching any row's `toGrams`. Pure structural resize — pair with `reflowPourWeights()` to
+    /// also refresh the suggested targets.
+    mutating func reflowPourCount(to count: Int) {
+        let target = max(0, count)
+        if pours.count < target {
+            for i in pours.count..<target { pours.append(Pour(order: i + 1)) }
+        } else if pours.count > target {
+            pours = Array(pours.prefix(target))
+        }
+        for i in pours.indices { pours[i].order = i + 1 }
+    }
+
+    /// Overwrites every row's cumulative target with a fresh suggested ramp for the current pour
+    /// count and total water. A no-op when there's nothing to suggest from (see
+    /// `suggestedCumulativeTargets`).
+    mutating func reflowPourWeights() {
+        let targets = suggestedCumulativeTargets(count: pours.count)
+        guard targets.count == pours.count else { return }
+        for i in pours.indices { pours[i].toGrams = targets[i] }
+    }
+
     /// Suggested cumulative water targets for `count` pours, used to pre-fill the breakdown so
     /// you're not doing arithmetic mid-brew. When a dose is known, the bloom (pour 1) gets ~3×
-    /// dose and the rest is split evenly to the total; otherwise it's a plain even split. The
-    /// last target always lands exactly on the total. Empty when there's no total to work from.
+    /// dose and the rest is split evenly to the total; otherwise it's a plain even split.
+    /// Interior pours round to a practical 5g grid — numbers you can actually pour to — but the
+    /// *last* one is the total itself and lands on it exactly, unrounded: the last row is a live,
+    /// editable view of total water (see `RecipeEditor`'s `PourRow`), and rounding it here would
+    /// silently overwrite whatever precise number was just typed into it. Empty when there's no
+    /// total to work from.
     func suggestedCumulativeTargets(count: Int) -> [Double] {
         guard count > 0, let total = effectiveWaterGrams, total > 0 else { return [] }
         func r5(_ x: Double) -> Double { max(0, (x / 5).rounded() * 5) }
@@ -130,7 +197,7 @@ struct Recipe: Codable, Hashable {
             targets = (1...count).map { total * Double($0) / Double(count) }
         }
         targets = targets.map(r5)
-        targets[count - 1] = r5(total)   // land exactly on the total
+        targets[count - 1] = total   // the last pour *is* the total — exact, not rounded
         return targets
     }
 
@@ -164,9 +231,17 @@ struct Recipe: Codable, Hashable {
     }
 }
 
-/// Renders a ratio without a trailing `.0` (15 → "15", 15.5 → "15.5").
+/// Renders a ratio to at most 2 decimal places, without a trailing `.0` or `0` (15 → "15",
+/// 15.5 → "15.5", a dose-derived 14.6667 → "14.67"). `String(r)` alone would print every
+/// binary-decimal digit a derived ratio can carry (e.g. "14.666666666666666") — this rounds
+/// first so bidirectionally-synced values stay readable.
 func ratioText(_ r: Double) -> String {
-    r.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(r)) : String(r)
+    let rounded = (r * 100).rounded() / 100
+    if rounded.truncatingRemainder(dividingBy: 1) == 0 { return String(Int(rounded)) }
+    var s = String(format: "%.2f", rounded)
+    while s.hasSuffix("0") { s.removeLast() }
+    if s.hasSuffix(".") { s.removeLast() }
+    return s
 }
 
 /// Formats seconds as `m:ss` (135 → "2:15").
