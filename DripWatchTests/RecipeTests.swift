@@ -43,7 +43,7 @@ struct RecipeTests {
 
     @Test func blankPourDoesNotMakeRecipeNonEmpty() {
         var r = Recipe()
-        r.pours = [Pour(order: 1)]   // an "Add pour" row the user never filled in
+        r.pours = [Pour(order: 1)]   // a laid-out row that never got a weight
         #expect(r.isEmpty)
         #expect(!r.hasPourBreakdown)
     }
@@ -246,62 +246,31 @@ struct RecipeTests {
         #expect(brewTwo.pours.last?.toGrams == 240)
     }
 
-    // MARK: - Breakdown → pour count (the other sync direction)
+    // MARK: - The last pour is a live view of total water
 
-    @Test func addPourAppendsARowAndBumpsPourCount() {
-        var r = Recipe()
-        r.addPour(); r.addPour(); r.addPour()
-        #expect(r.pours.count == 3)
-        #expect(r.pourCount == 3)
-        #expect(r.pours.map(\.order) == [1, 2, 3])
+    @Test func lastSuggestedTargetLandsExactlyOnTotalEvenWhenNotOnTheFiveGramGrid() {
+        // 223g isn't a multiple of 5 — the last row must still show it exactly, since it *is*
+        // total water, not a rounded suggestion. Interior pours still round to a practical grid.
+        var r = Recipe(); r.doseGrams = 15
+        r.setTotalWater(223)
+        let t = r.suggestedCumulativeTargets(count: 4)
+        // `total` here is dose × a derived ratio, so it round-trips to ~223 with float noise —
+        // an exact `==` would be testing floating-point rounding, not the reflow logic.
+        #expect(abs(t.last! - 223) < 0.0001)
+        #expect(t.dropLast().allSatisfy { $0.truncatingRemainder(dividingBy: 5) == 0 })
     }
 
-    @Test func addPourStopsAtTheDeclaredCeiling() {
-        var r = Recipe()
-        for _ in 0..<Recipe.pourCountRange.upperBound { r.addPour() }
-        #expect(r.pours.count == Recipe.pourCountRange.upperBound)
-        r.addPour()   // one more, past the ceiling
-        #expect(r.pours.count == Recipe.pourCountRange.upperBound)
-        #expect(r.pourCount == Recipe.pourCountRange.upperBound)
-    }
-
-    @Test func removePourDropsTheRowRenumbersAndDecrementsPourCount() {
-        var r = Recipe()
-        r.pours = [
-            Pour(order: 1, toGrams: 45),
-            Pour(order: 2, toGrams: 120),
-            Pour(order: 3, toGrams: 225),
-        ]
-        r.pourCount = 3
-        let middleID = r.pours[1].id
-        r.removePour(id: middleID)
-        #expect(r.pours.count == 2)
-        #expect(r.pourCount == 2)
-        #expect(r.pours.map(\.order) == [1, 2])
-        // A single-row removal is surgical — it must not touch the surviving rows' weights.
-        #expect(r.pours.map(\.toGrams) == [45, 225])
-    }
-
-    @Test func removingTheLastPourClearsPourCount() {
-        var r = Recipe()
-        r.pours = [Pour(order: 1, toGrams: 100)]
-        r.pourCount = 1
-        r.removePour(id: r.pours[0].id)
-        #expect(r.pours.isEmpty)
-        #expect(r.pourCount == nil)
-    }
-
-    @Test func addThenRemoveRoundTripsPourCountBackToTheStartingValue() {
+    @Test func editingLastPourThenReflowingRoundTripsTheExactTypedValue() {
+        // Models the live last-row edit end-to-end: type an exact total via `setTotalWater` (what
+        // the last pour's field now does), then the reflow that edit triggers — the last row must
+        // come back to exactly what was typed, not get rounded away by its own reflow.
         var r = Recipe(); r.doseGrams = 15; r.ratio = 15
         r.reflowPourCount(to: 4)
         r.reflowPourWeights()
-        #expect(r.pourCount == nil)   // reflowPourCount alone doesn't touch pourCount…
-        r.pourCount = 4               // …so set it the way the "Pours" field would.
-        r.addPour()
-        #expect(r.pourCount == 5)
-        r.removePour(id: r.pours.last!.id)
-        #expect(r.pourCount == 4)
-        #expect(r.pours.count == 4)
+        r.setTotalWater(223)
+        r.reflowPourWeights()
+        #expect(abs(r.pours.last!.toGrams! - 223) < 0.0001)
+        #expect(r.ratio == 223.0 / 15.0)
     }
 
     @Test func carryingPoursIntoTheNextBrewThenChangingPourCountReflowsRowCountAndWeights() {

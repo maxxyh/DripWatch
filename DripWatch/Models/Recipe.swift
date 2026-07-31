@@ -176,29 +176,14 @@ struct Recipe: Codable, Hashable {
         for i in pours.indices { pours[i].toGrams = targets[i] }
     }
 
-    /// Appends one blank pour row (capped at `pourCountRange.upperBound`) and keeps `pourCount`
-    /// in step with the new row count. Bidirectional sync with the "Pours" field is the whole
-    /// point of this method existing rather than the caller mutating `pours` directly — the two
-    /// must never be able to drift apart.
-    mutating func addPour() {
-        guard pours.count < Recipe.pourCountRange.upperBound else { return }
-        pours.append(Pour(order: pours.count + 1))
-        pourCount = pours.count
-    }
-
-    /// Removes the pour with `id`, renumbers the rest, and keeps `pourCount` in step with the
-    /// new row count (nil once the last row is gone). The other half of `addPour()`'s
-    /// bidirectional-sync guarantee, for the breakdown's per-row remove button.
-    mutating func removePour(id: UUID) {
-        pours.removeAll { $0.id == id }
-        for i in pours.indices { pours[i].order = i + 1 }
-        pourCount = pours.isEmpty ? nil : pours.count
-    }
-
     /// Suggested cumulative water targets for `count` pours, used to pre-fill the breakdown so
     /// you're not doing arithmetic mid-brew. When a dose is known, the bloom (pour 1) gets ~3×
-    /// dose and the rest is split evenly to the total; otherwise it's a plain even split. The
-    /// last target always lands exactly on the total. Empty when there's no total to work from.
+    /// dose and the rest is split evenly to the total; otherwise it's a plain even split.
+    /// Interior pours round to a practical 5g grid — numbers you can actually pour to — but the
+    /// *last* one is the total itself and lands on it exactly, unrounded: the last row is a live,
+    /// editable view of total water (see `RecipeEditor`'s `PourRow`), and rounding it here would
+    /// silently overwrite whatever precise number was just typed into it. Empty when there's no
+    /// total to work from.
     func suggestedCumulativeTargets(count: Int) -> [Double] {
         guard count > 0, let total = effectiveWaterGrams, total > 0 else { return [] }
         func r5(_ x: Double) -> Double { max(0, (x / 5).rounded() * 5) }
@@ -212,7 +197,7 @@ struct Recipe: Codable, Hashable {
             targets = (1...count).map { total * Double($0) / Double(count) }
         }
         targets = targets.map(r5)
-        targets[count - 1] = r5(total)   // land exactly on the total
+        targets[count - 1] = total   // the last pour *is* the total — exact, not rounded
         return targets
     }
 
