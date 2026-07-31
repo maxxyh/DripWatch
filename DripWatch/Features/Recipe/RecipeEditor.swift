@@ -163,13 +163,14 @@ struct RecipeEditor: View {
 struct StepperCluster<Content: View>: View {
     let onMinus: () -> Void
     let onPlus: () -> Void
+    var contentWidth: CGFloat = 74
     @ViewBuilder var content: Content
 
     var body: some View {
         HStack(spacing: 0) {
             button("minus", onMinus)
             divider
-            content.frame(width: 74).frame(maxHeight: .infinity)
+            content.frame(width: contentWidth).frame(maxHeight: .infinity)
             divider
             button("plus", onPlus)
         }
@@ -354,7 +355,10 @@ private struct RatioField: View {
         HStack(spacing: 8) {
             Label("Ratio", systemImage: "divide").font(.subheadline).foregroundStyle(.secondary)
             Spacer(minLength: 8)
-            StepperCluster(onMinus: { bump(-1) }, onPlus: { bump(1) }) {
+            // Wider than the default stepper slot: even a single 0.5 bump off a whole number
+            // (15 → 15.5) needs more than the default 74pt affords once "1:" shares the space —
+            // a dose-derived ratio (14.67) needs still more, or it clips.
+            StepperCluster(onMinus: { bump(-1) }, onPlus: { bump(1) }, contentWidth: 92) {
                 HStack(spacing: 1) {
                     Text("1:").font(.param(.body, weight: .semibold)).foregroundStyle(.secondary)
                     // 2 decimal places, not 1: a ratio derived from a typed total water ÷ dose
@@ -363,7 +367,7 @@ private struct RatioField: View {
                     TextField("—", value: $ratio, format: .number.precision(.fractionLength(0...2)))
                         .keyboardType(.decimalPad).multilineTextAlignment(.leading)
                         .font(.param(.body, weight: .semibold))
-                        .frame(width: 40)
+                        .frame(width: 58)
                 }
             }
         }
@@ -536,9 +540,12 @@ private struct PourRow: View {
                 }
                 Spacer(minLength: 4)
                 if isLastPour {
+                    // Wider than the other rows: this one shows the exact, unrounded total (see
+                    // the type-level doc comment above) — "247.5" needs more room than a plain
+                    // integer like the interior rows' "999" does, or it clips.
                     TextField("g", value: totalWater, format: .number.precision(.fractionLength(0...1)))
                         .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
-                        .frame(width: 46).font(.param(.subheadline, weight: .semibold))
+                        .frame(width: 64).font(.param(.subheadline, weight: .semibold))
                         .foregroundStyle(Theme.accent)
                 } else {
                     TextField("g", value: $pour.toGrams, format: .number.precision(.fractionLength(0...0)))
