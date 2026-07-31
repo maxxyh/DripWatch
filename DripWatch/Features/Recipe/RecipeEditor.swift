@@ -503,27 +503,26 @@ private struct PourBreakdown: View {
             }
             Button {
                 Haptics.tap()
-                let next = (recipe.pourCount ?? recipe.pours.count) + 1
-                recipe.pourCount = min(next, Recipe.pourCountRange.upperBound)
+                recipe.addPour()
+                // Adding a row is a "count changed" event upstream (unlike removing one, below)
+                // — it's meant to re-flow the whole ramp to accommodate the new pour, so we
+                // deliberately do NOT pre-sync `syncedPourCount` here.
             } label: {
                 Label("Add pour", systemImage: "plus.circle")
             }
-            .disabled((recipe.pourCount ?? recipe.pours.count) >= Recipe.pourCountRange.upperBound)
+            .disabled(recipe.pours.count >= Recipe.pourCountRange.upperBound)
             .font(.subheadline).buttonStyle(.plain).foregroundStyle(Theme.accent)
         }
     }
 
     private func remove(_ pour: Pour) {
         Haptics.tap()
-        recipe.pours.removeAll { $0.id == pour.id }
-        for i in recipe.pours.indices { recipe.pours[i].order = i + 1 }
-        let newCount = recipe.pours.isEmpty ? nil : recipe.pours.count
-        // Mark this count as already synced *before* writing it, so the `onChange(of:
-        // recipe.pourCount)` this triggers upstream sees a matching count and skips the weight
-        // re-flow — deleting one row should just remove that row, not overwrite the gram values
-        // of every row the user left alone.
-        syncedPourCount = newCount
-        recipe.pourCount = newCount
+        recipe.removePour(id: pour.id)
+        // Mark this count as already synced, so the `onChange(of: recipe.pourCount)` this
+        // triggered upstream sees a matching count and skips the weight re-flow — deleting one
+        // row should just remove that row, not overwrite the gram values of every row the user
+        // left alone.
+        syncedPourCount = recipe.pourCount
     }
 }
 

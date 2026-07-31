@@ -246,6 +246,64 @@ struct RecipeTests {
         #expect(brewTwo.pours.last?.toGrams == 240)
     }
 
+    // MARK: - Breakdown → pour count (the other sync direction)
+
+    @Test func addPourAppendsARowAndBumpsPourCount() {
+        var r = Recipe()
+        r.addPour(); r.addPour(); r.addPour()
+        #expect(r.pours.count == 3)
+        #expect(r.pourCount == 3)
+        #expect(r.pours.map(\.order) == [1, 2, 3])
+    }
+
+    @Test func addPourStopsAtTheDeclaredCeiling() {
+        var r = Recipe()
+        for _ in 0..<Recipe.pourCountRange.upperBound { r.addPour() }
+        #expect(r.pours.count == Recipe.pourCountRange.upperBound)
+        r.addPour()   // one more, past the ceiling
+        #expect(r.pours.count == Recipe.pourCountRange.upperBound)
+        #expect(r.pourCount == Recipe.pourCountRange.upperBound)
+    }
+
+    @Test func removePourDropsTheRowRenumbersAndDecrementsPourCount() {
+        var r = Recipe()
+        r.pours = [
+            Pour(order: 1, toGrams: 45),
+            Pour(order: 2, toGrams: 120),
+            Pour(order: 3, toGrams: 225),
+        ]
+        r.pourCount = 3
+        let middleID = r.pours[1].id
+        r.removePour(id: middleID)
+        #expect(r.pours.count == 2)
+        #expect(r.pourCount == 2)
+        #expect(r.pours.map(\.order) == [1, 2])
+        // A single-row removal is surgical — it must not touch the surviving rows' weights.
+        #expect(r.pours.map(\.toGrams) == [45, 225])
+    }
+
+    @Test func removingTheLastPourClearsPourCount() {
+        var r = Recipe()
+        r.pours = [Pour(order: 1, toGrams: 100)]
+        r.pourCount = 1
+        r.removePour(id: r.pours[0].id)
+        #expect(r.pours.isEmpty)
+        #expect(r.pourCount == nil)
+    }
+
+    @Test func addThenRemoveRoundTripsPourCountBackToTheStartingValue() {
+        var r = Recipe(); r.doseGrams = 15; r.ratio = 15
+        r.reflowPourCount(to: 4)
+        r.reflowPourWeights()
+        #expect(r.pourCount == nil)   // reflowPourCount alone doesn't touch pourCount…
+        r.pourCount = 4               // …so set it the way the "Pours" field would.
+        r.addPour()
+        #expect(r.pourCount == 5)
+        r.removePour(id: r.pours.last!.id)
+        #expect(r.pourCount == 4)
+        #expect(r.pours.count == 4)
+    }
+
     @Test func carryingPoursIntoTheNextBrewThenChangingPourCountReflowsRowCountAndWeights() {
         var brewOne = Recipe(); brewOne.doseGrams = 15; brewOne.ratio = 15
         brewOne.pourCount = 4

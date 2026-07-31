@@ -176,6 +176,25 @@ struct Recipe: Codable, Hashable {
         for i in pours.indices { pours[i].toGrams = targets[i] }
     }
 
+    /// Appends one blank pour row (capped at `pourCountRange.upperBound`) and keeps `pourCount`
+    /// in step with the new row count. Bidirectional sync with the "Pours" field is the whole
+    /// point of this method existing rather than the caller mutating `pours` directly — the two
+    /// must never be able to drift apart.
+    mutating func addPour() {
+        guard pours.count < Recipe.pourCountRange.upperBound else { return }
+        pours.append(Pour(order: pours.count + 1))
+        pourCount = pours.count
+    }
+
+    /// Removes the pour with `id`, renumbers the rest, and keeps `pourCount` in step with the
+    /// new row count (nil once the last row is gone). The other half of `addPour()`'s
+    /// bidirectional-sync guarantee, for the breakdown's per-row remove button.
+    mutating func removePour(id: UUID) {
+        pours.removeAll { $0.id == id }
+        for i in pours.indices { pours[i].order = i + 1 }
+        pourCount = pours.isEmpty ? nil : pours.count
+    }
+
     /// Suggested cumulative water targets for `count` pours, used to pre-fill the breakdown so
     /// you're not doing arithmetic mid-brew. When a dose is known, the bloom (pour 1) gets ~3×
     /// dose and the rest is split evenly to the total; otherwise it's a plain even split. The
