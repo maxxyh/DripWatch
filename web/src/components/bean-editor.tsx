@@ -53,6 +53,8 @@ export function BeanEditor({ id }: { id?: string }) {
     [row, setRow] = useState<BeanRow | null>(null),
     [photos, setPhotos] = useState<PhotoDraft[]>([]),
     [removedPhotos, setRemovedPhotos] = useState<BeanPhotoRow[]>([]),
+    [loading, setLoading] = useState(Boolean(id)),
+    [loadError, setLoadError] = useState(""),
     [busy, setBusy] = useState(false),
     objectUrls = useRef(new Set<string>());
   useEffect(
@@ -64,9 +66,13 @@ export function BeanEditor({ id }: { id?: string }) {
   );
   useEffect(() => {
     if (id)
-      fetchNotebook().then((n) => {
+      fetchNotebook()
+        .then((n) => {
         const b = n.beans.find((x) => x.id === id);
-        if (!b) return;
+        if (!b) {
+          setLoadError("This bean is not available.");
+          return;
+        }
         setRow(b);
         setPhotos(
           n.beanPhotos
@@ -94,7 +100,15 @@ export function BeanEditor({ id }: { id?: string }) {
           roaster_notes: b.roaster_notes ?? "",
           my_flavor_tags: b.my_flavor_tags.join(", "),
         });
-      });
+        })
+        .catch(() =>
+          setLoadError(
+            navigator.onLine
+              ? "The bean editor could not be loaded."
+              : "Editors are unavailable offline. Your cached notebook remains read-only.",
+          ),
+        )
+        .finally(() => setLoading(false));
   }, [id]);
   const change = (key: keyof Form, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -237,6 +251,18 @@ export function BeanEditor({ id }: { id?: string }) {
     });
     setPhotos((current) => [...current, ...additions]);
   }
+  if (loading)
+    return <main className="mx-auto max-w-2xl px-4 py-20">Loading bean…</main>;
+  if (loadError)
+    return (
+      <main className="mx-auto max-w-2xl px-4 py-20">
+        <h1 className="text-2xl font-semibold">Bean editor unavailable</h1>
+        <p className="mt-2 text-muted-foreground">{loadError}</p>
+        <Button className="mt-5" variant="outline" onClick={() => router.back()}>
+          <ArrowLeft data-icon="inline-start" /> Back
+        </Button>
+      </main>
+    );
   return (
     <EditorFrame title={row ? "Edit bean" : "Add bean"}>
       <form onSubmit={save}>
