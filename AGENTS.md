@@ -1,127 +1,89 @@
 # DripWatch
 
-A native iOS (SwiftUI + SwiftData) coffee brewing companion. It replaces a paper brewing
-notebook — but the point isn't logging, it's the **feedback loop**: brew parameters → taste →
-the recipe to try next time.
+Native iOS coffee-brewing companion built with SwiftUI and SwiftData. The product is the
+feedback loop—brew parameters → taste → next recipe—not merely a logging notebook.
 
-## Product north star
+`AGENTS.md` is canonical project guidance. `CLAUDE.md` is a symlink to this file.
 
-- **Pourover first** (the owner is an expert here); **espresso** capture is now also in
-  (method-aware `RecipeEditor` / `BrewCaptureView`). Bag **OCR** (Vision) auto-fills fields.
-- The **bean is the hero**: each bean is a "character card" (bag photo + roaster-style facts).
-- **One Recipe, one editor**: a brew *has* a recipe, and the planned "next brew" *is* a draft
-  recipe edited in the same UI while tasting. The next brew seeds from that draft.
-- **Grind is absolute + reproducible** — `1Zpresso J · 3(−1)` (grinder · dial(±clicks), where
-  `+` = finer/clockwise, `−` = coarser/anticlockwise). The "N clicks coarser/finer than last
-  time" is a *computed annotation only*, never a replacement for the absolute value.
-- **Structured but optional/progressive**: a simple recipe line is the default; per-pour
-  breakdown and taste balance are folded away until wanted.
-- Multi-user sync (pourover is collaborative) is a **later phase**; the data model is already
-  sync-shaped so it's additive, not a rewrite.
+## Mandatory living-documentation contract
 
-The historical brainstorming plan is local-only; this file is the canonical project guidance.
+After **every piece of work**, review this file and the relevant `docs/` pages. Update them in
+the same change whenever architecture, behavior, operational steps, constraints, or verified
+learnings changed. This documentation review is mandatory even when no edit is ultimately
+needed. Keep this file concise; put durable topic detail in `docs/<topic>.md` and link it here.
 
-## Architecture
+## Product invariants
 
-- **Persistence**: SwiftData (`@Model` classes: `Bean`, `Brew`, `Grinder`). Value types
-  (`Recipe`, `Pour`, `GrindSetting`, `Taste`, `TasteBalance`) are `Codable` structs embedded on
-  the models — this is what lets one `Recipe` be reused for both a brew and its next-draft.
-- **Sync-readiness**: everything conforms to `Syncable` (`id`, `createdAt`, `updatedAt`,
-  `deletedAt` soft-delete). All attributes have defaults and relationships are optional — the
-  shape CloudKit will require later. Deletes are soft (set `deletedAt`), not hard.
-- **The signature feature** is `BrewDiff` (`Features/Loop/BrewDiff.swift`): the param delta
-  between consecutive brews of a bean, shown as an annotation above the always-visible absolute
-  recipe (`RecipeReadout`).
+- Pourover first; espresso capture is also method-aware.
+- The bean is the hero: bag photos plus roaster facts form its character card.
+- One reusable `RecipeEditor`; a brew owns a recipe and its planned next brew is a draft recipe.
+- Grind is absolute and reproducible: `grinder · dial(±clicks)`. Deltas are annotations only.
+- Structured but progressive: everyday recipe line first, detail only when requested.
+- Meaning is never color-only. Preserve Dynamic Type, ≥44pt targets, semantic colors, and
+  `Theme`-based adaptive surfaces.
 
-### Source layout (`DripWatch/`)
+## Architecture at a glance
 
+- **Local persistence:** SwiftData models `Bean`, `BeanPhoto`, `Brew`, `Grinder`, and
+  `LexiconTerm`. Embedded value types such as `Recipe` and `Taste` remain `Codable` structs.
+- **Cloud sync:** Supabase Postgres is server truth when online; private Supabase Storage buckets
+  hold compressed bean and brew photos. See [docs/supabase-sync.md](docs/supabase-sync.md).
+- **Sync identity:** every persisted model is `Syncable` with stable `id`, `createdAt`,
+  `updatedAt`, and soft-delete `deletedAt`. Stored properties need safe defaults.
+- **Signature loop:** `Features/Loop/BrewDiff.swift` computes parameter changes between brews;
+  `RecipeReadout` always keeps the absolute recipe visible.
+
+### Source layout
+
+```text
+DripWatchApp.swift          App/container setup and sync startup/foreground refresh
+Models/                     SwiftData models and embedded Codable values
+Features/                   Beans, Capture, Recipe, Loop, Scan
+Sync/                       DTOs, remote seam, Supabase transport, outbox, bootstrap, engine
+DesignSystem/               Theme, layouts, DEBUG sample data
+DripWatchTests/             Swift Testing suites, including sync transport/DTO/outbox coverage
+supabase/                   Declarative hosted schema, backup docs, launchd template
+scripts/                    Operational scripts
 ```
-DripWatchApp.swift          @main + ModelContainer (sync-ready config)
-Models/                     Bean, Brew, Grinder, Recipe, Pour, GrindSetting, Taste, Syncable
-Features/
-  Beans/                    Shelf grid, add-bean sheet, detail, character card, taste dots
-  Recipe/                   RecipeEditor (THE reusable editor) + GrindPicker
-  Capture/                  PouroverBrewView (log → taste → draft-next inline)
-  Loop/                     BrewHistoryView + BrewDiff (history log + delta annotation)
-DesignSystem/               Theme, WrapLayout, SampleData (DEBUG-only)
-```
 
-The Xcode project uses **synchronized file groups** (Xcode 16, `objectVersion 77`): any Swift
-file added under `DripWatch/` is picked up automatically — no `.pbxproj` edits per file.
+The project uses Xcode 16 synchronized file groups; Swift files added under `DripWatch/` are
+picked up automatically. The Supabase Swift package is pinned and its lockfile is committed.
 
-## Design conventions (HIG-aligned)
+## Build and verification
 
-- **Aesthetic**: monochrome, shadcn-inspired. A near-neutral zinc base, hairline-bordered
-  cards (`Theme.radius` 14, whisper shadow), and a **single red accent** (`Theme.accent`).
-  Color enters *only* through bag photos, the accent, and the red-tinted "next brew" plan
-  card. Bean-photo placeholders are neutral on purpose.
-- **Colors**: text uses semantic colors (`Color(.label)`, `.secondary`); every container/
-  accent color goes through `Theme` via `Color.adaptive(light:dark:)` so Dark Mode is correct.
-  Never hardcode a one-appearance color (the one deliberate exception — the brew-count badge's
-  `.white` over a photo — is commented). Positive taste = `Theme.sage` (emerald), negative =
-  `Theme.clay` (rose), each paired with a +/− symbol.
-- **Params typography**: numeric brew params render in `Font.param(...)` (SF Mono) for an
-  instrument-data feel; uppercase metadata labels use `.overline()` (tracked, muted).
-- **Typography**: semantic text styles only (`.headline`, `.subheadline`, `.caption`) — no
-  hardcoded point sizes, so Dynamic Type works.
-- **Touch targets**: use `.hitTarget()` (≥44pt) on small tappable controls.
-- **Haptics**: `Haptics.tap/select/success` for physical / selection / outcome feedback.
-- **Meaning is never color-alone**: taste chips carry a `+`/`−` symbol; balance uses filled
-  dots + a text value.
-
-## Build & run
-
-Simulator: **iPhone 16** (iOS 17+ deployment target, iOS 18.2 SDK).
+Target: iOS 17+, iPhone 16 simulator, iOS 18.2 SDK.
 
 ```bash
 xcodebuild -project DripWatch.xcodeproj -scheme DripWatch \
   -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' \
   -configuration Debug build
 
-xcrun simctl install "iPhone 16" <DerivedData>/…/DripWatch.app
-xcrun simctl launch "iPhone 16" com.dripwatch.DripWatch
-```
-
-### DEBUG verification launch args (no manual tapping needed)
-
-`SampleData.swift` and the debug hooks in `BeanListView`/`BeanDetailView` respond to:
-
-- `-seedSampleData 1` — seed the real notebook's Voyager (22/06 → 23/06) + Crimson beans
-- `-openFirstBean 1` — navigate straight to a brewed bean
-- `-openEspressoBean 1` — navigate to a bean with an espresso brew (Crimson)
-- `-openBrewSheet 1` — auto-present the brew capture sheet
-- `-scrollToHistory 1` — scroll to the history log
-
-Screenshot: `xcrun simctl io "iPhone 16" screenshot out.png`. Toggle appearance with
-`xcrun simctl ui "iPhone 16" appearance dark|light`.
-
-> Note: when the user drives this machine via **mobile remote control**, computer-use
-> Simulator control can't get its approval dialog — use `simctl` + the launch args above.
-
-## Testing
-
-Unit tests live in `DripWatchTests/` (Swift Testing — `import Testing`, `@Test`). Run:
-
-```bash
 xcodebuild test -project DripWatch.xcodeproj -scheme DripWatch \
   -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
-Coverage is on the pure logic: `BrewDiff` (grind/temp/ratio/yield/shot-time deltas, and the
-rule that a finer/coarser *direction* is only asserted for the same grinder + dial),
-`GrindSetting` display/offset, `Recipe` (shotRatio / effectiveWater / isEmpty incl. blank
-pours / summaryLine), `BagOCR.parse` (columnar + inline layouts, value-consumption, name
-heuristic), and `Bean` per-method seeding/pending.
+DEBUG launch arguments: `-seedSampleData 1`, `-openFirstBean 1`, `-openEspressoBean 1`,
+`-openBrewSheet 1`, and `-scrollToHistory 1`.
 
-> Note: the test bundle is hosted in the app, and a hosted SwiftData `ModelContainer` crashes
-> in this setup — `BeanSeedTests` therefore exercises the model on **standalone objects** (no
-> container), wiring `bean.brews` directly. Keep new model-logic tests container-free.
+The hosted test bundle can hang/crash when a SwiftData `ModelContainer` is created inside it;
+keep pure model-logic tests container-free and wire standalone relationships directly. For sync
+work, also verify against the real Supabase project and run security/performance advisors.
 
-## Conventions for changes
+## Change conventions
 
-- Keep new persisted types `Syncable` (id/createdAt/updatedAt/deletedAt) and give every stored
-  property a default so the CloudKit phase stays additive.
-- Reuse `RecipeEditor` anywhere a recipe is edited — do not fork a second recipe UI.
-- Grind: always display the full absolute `GrindSetting.display`; deltas are annotations.
-- New user-facing params belong on the `Recipe` struct as optionals, surfaced in the simple
-  line if everyday, otherwise behind the progressive breakdown.
+- Every user mutation of a syncable model must call `markDirty()`; deletes use `softDelete()`.
+- Never hard-delete synced records or expose a service-role/secret key in the app.
+- Reuse `RecipeEditor`; do not fork a second recipe-editing interface.
+- Always display full `GrindSetting.display`; deltas never replace the absolute setting.
+- New recipe parameters are optional. Put everyday values in the simple line and specialist
+  values behind progressive disclosure.
+- Preserve unrelated user work in a dirty worktree. Do not stage local secrets.
+- Before handoff: build, run proportional tests, verify external state when touched, review the
+  diff independently for complex work, perform the mandatory documentation review, then commit.
+
+## Topic library
+
+- [Supabase sync architecture and operations](docs/supabase-sync.md)
+- [Engineering process and session learnings](docs/engineering-process.md)
+- [Supabase schema and setup](supabase/README.md)
+- [Backup and restore runbook](supabase/backup/README.md)
