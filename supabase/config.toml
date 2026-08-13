@@ -1,0 +1,6 @@
+# Safe local-only template configuration. Replace project_id only when this
+# directory is initialized for a specific Supabase project; do not commit keys.
+project_id = "dripwatch"
+
+[db.migrations]
+schema_paths = ["./schemas/dripwatch.sql"]

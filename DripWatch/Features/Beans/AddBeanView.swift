@@ -396,9 +396,11 @@ struct AddBeanView: View {
         let key = term.lowercased()
         if let existing = lexiconTerms.first(where: { $0.deletedAt == nil && $0.term == key }) {
             existing.field = field
-            existing.updatedAt = .now
+            existing.markDirty()
         } else {
-            context.insert(LexiconTerm(term: key, field: field))
+            let term = LexiconTerm(term: key, field: field)
+            context.insert(term)
+            term.markDirty()
         }
     }
 
@@ -420,9 +422,9 @@ struct AddBeanView: View {
         bean.roastLevel = roastLevel.nilIfBlank?.normalizedTerm
         bean.roastDate = hasRoastDate ? roastDate : nil
         bean.roasterNotes = roasterNoteTags.isEmpty ? nil : roasterNoteTags.normalizedTerms.joined(separator: ", ")
-        bean.updatedAt = .now
         if editingBean == nil { context.insert(bean) }
         applyPhotos(to: bean)
+        bean.markDirty()
         Haptics.success()
         dismiss()
     }
@@ -432,17 +434,17 @@ struct AddBeanView: View {
     private func applyPhotos(to bean: Bean) {
         let kept = Set(photoDrafts.compactMap { $0.existing?.id })
         for photo in bean.photos where photo.deletedAt == nil && !kept.contains(photo.id) {
-            photo.deletedAt = .now
-            photo.updatedAt = .now
+            photo.softDelete()
         }
         for (index, draft) in photoDrafts.enumerated() {
             if let existing = draft.existing {
                 existing.order = index
-                existing.updatedAt = .now
+                existing.markDirty()
             } else {
                 let photo = BeanPhoto(data: draft.data, order: index)
                 photo.bean = bean
                 context.insert(photo)
+                photo.markDirty()
             }
         }
         bean.bagPhoto = nil

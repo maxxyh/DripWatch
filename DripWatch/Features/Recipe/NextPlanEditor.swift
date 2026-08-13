@@ -114,12 +114,12 @@ struct NextPlanEditor: View {
 
     private func persist() {
         bean.setPendingNextRecipe(draft, for: method)
-        bean.updatedAt = .now
+        bean.markDirty()
     }
 
     private func discard() {
         bean.setPendingNextRecipe(nil, for: method)
-        bean.updatedAt = .now
+        bean.markDirty()
         Haptics.tap()
         dismiss()
     }

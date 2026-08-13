@@ -236,6 +236,7 @@ struct BrewCaptureView: View {
         let brew = Brew(brewedAt: brewedAt, method: method, recipe: recipe)
         brew.bean = bean
         context.insert(brew)
+        brew.markDirty()
         liveBrew = brew
         committed = true
         persist()
@@ -250,12 +251,12 @@ struct BrewCaptureView: View {
         brew.taste = taste
         brew.photo = photoData
         brew.nextRecipeDraft = planNext ? nextDraft : nil
-        brew.updatedAt = .now
+        brew.markDirty()
         // The plan seeds next time — but only from the newest brew of its method.
         if bean.lastBrew(for: method)?.id == brew.id {
             bean.setPendingNextRecipe(planNext ? nextDraft : nil, for: method)
         }
-        bean.updatedAt = .now
+        bean.markDirty()
     }
 
     // MARK: Phases

@@ -3,9 +3,19 @@ import SwiftData
 
 @main
 struct DripWatchApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     /// Shared SwiftData container. Local-first today; the schema is written to be
     /// sync-ready (stable ids, updatedAt, soft-delete) so CloudKit can be switched on later.
-    let container: ModelContainer = {
+    let container: ModelContainer
+    @StateObject private var syncEngine: SyncEngine
+
+    init() {
+        let container = Self.makeContainer()
+        self.container = container
+        _syncEngine = StateObject(wrappedValue: SyncEngine(context: container.mainContext))
+    }
+
+    private static func makeContainer() -> ModelContainer {
         let schema = Schema([
             Bean.self,
             BeanPhoto.self,
@@ -30,14 +40,20 @@ struct DripWatchApp: App {
                 fatalError("ModelContainer failed even after relocating the store: \(error)")
             }
         }
-    }()
+    }
 
     var body: some Scene {
         WindowGroup {
             BeanListView()
+                .environmentObject(syncEngine)
                 .task {
                     SampleData.seedIfRequested(container.mainContext)
                     DataMaintenance.normalizeExistingIfNeeded(container.mainContext)
+                    await syncEngine.start()
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active else { return }
+                    Task { await syncEngine.syncNow() }
                 }
         }
         .modelContainer(container)

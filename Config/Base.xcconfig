@@ -1,0 +1,4 @@
+// Shared app build settings. Local secrets override these empty defaults when present.
+SUPABASE_URL =
+SUPABASE_PUBLISHABLE_KEY =
+#include? "Secrets.xcconfig"

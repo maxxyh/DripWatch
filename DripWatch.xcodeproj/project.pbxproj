@@ -6,6 +6,10 @@
 	objectVersion = 70;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3C0000000000000000000010 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 3C0000000000000000000013 /* Supabase */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		2B000000000000000000000B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -19,6 +23,8 @@
 /* Begin PBXFileReference section */
 		1A0000000000000000000005 /* DripWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DripWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B0000000000000000000002 /* DripWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DripWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3C0000000000000000000014 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		3C0000000000000000000015 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -31,6 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3C0000000000000000000010 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -49,8 +56,18 @@
 			children = (
 				1A000000000000000000000F /* DripWatch */,
 				2B0000000000000000000009 /* DripWatchTests */,
+				3C0000000000000000000016 /* Config */,
 				1A0000000000000000000003 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		3C0000000000000000000016 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				3C0000000000000000000014 /* Base.xcconfig */,
+				3C0000000000000000000015 /* Secrets.xcconfig.example */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		1A0000000000000000000003 /* Products */ = {
@@ -79,6 +96,9 @@
 			);
 			fileSystemSynchronizedGroups = (
 				1A000000000000000000000F /* DripWatch */,
+			);
+			packageProductDependencies = (
+				3C0000000000000000000013 /* Supabase */,
 			);
 			name = DripWatch;
 			productName = DripWatch;
@@ -135,6 +155,9 @@
 			);
 			mainGroup = 1A0000000000000000000002;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				3C0000000000000000000012 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			productRefGroup = 1A0000000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -186,6 +209,25 @@
 			targetProxy = 2B000000000000000000000B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		3C0000000000000000000012 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.46.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3C0000000000000000000013 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3C0000000000000000000012 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1A0000000000000000000007 /* Debug */ = {
@@ -309,6 +351,7 @@
 		};
 		1A000000000000000000000A /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3C0000000000000000000014 /* Base.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -319,6 +362,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "DripWatch uses the camera to photograph coffee bags for your bean cards.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "DripWatch adds bag photos from your library to your bean cards.";
+				INFOPLIST_KEY_SUPABASE_PUBLISHABLE_KEY = "$(SUPABASE_PUBLISHABLE_KEY)";
+				INFOPLIST_KEY_SUPABASE_URL = "$(SUPABASE_URL)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -339,6 +384,7 @@
 		};
 		1A000000000000000000000B /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3C0000000000000000000014 /* Base.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -349,6 +395,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "DripWatch uses the camera to photograph coffee bags for your bean cards.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "DripWatch adds bag photos from your library to your bean cards.";
+				INFOPLIST_KEY_SUPABASE_PUBLISHABLE_KEY = "$(SUPABASE_PUBLISHABLE_KEY)";
+				INFOPLIST_KEY_SUPABASE_URL = "$(SUPABASE_URL)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

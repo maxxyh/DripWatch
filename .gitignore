@@ -3,6 +3,11 @@
 build/
 DerivedData/
 *.xcodeproj/*.xcworkspace
+!DripWatch.xcodeproj/project.xcworkspace/
+DripWatch.xcodeproj/project.xcworkspace/*
+!DripWatch.xcodeproj/project.xcworkspace/xcshareddata/
+!DripWatch.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+!DripWatch.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 *.moved-aside
 *.pbxuser
 !default.pbxuser
@@ -22,7 +27,8 @@ xcuserdata/
 ## Swift Package Manager
 .build/
 .swiftpm/
-Package.resolved
+## Local Supabase configuration
+/Config/Secrets.xcconfig
 
 ## CocoaPods / Carthage (unused, but standard)
 Pods/

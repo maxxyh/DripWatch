@@ -194,9 +194,11 @@ struct GrindPicker: View {
         Haptics.select()
         if let existing = grinders.first(where: { $0.deletedAt == nil && $0.name == name }) {
             existing.stepless = value
-            existing.updatedAt = .now
+            existing.markDirty()
         } else {
-            context.insert(Grinder(name: name, stepless: value))
+            let grinder = Grinder(name: name, stepless: value)
+            context.insert(grinder)
+            grinder.markDirty()
         }
         if value { grind?.clickOffset = 0 }
     }
@@ -221,7 +223,9 @@ struct GrindPicker: View {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
         guard !grinders.contains(where: { $0.deletedAt == nil && $0.name == name }) else { return }
-        context.insert(Grinder(name: name))
+        let grinder = Grinder(name: name)
+        context.insert(grinder)
+        grinder.markDirty()
     }
 
 }

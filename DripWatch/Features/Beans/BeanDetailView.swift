@@ -200,21 +200,25 @@ struct BeanDetailView: View {
     /// Soft-delete a brew (sync-friendly), then refresh the pending plan.
     private func delete(_ brew: Brew) {
         Haptics.tap()
-        brew.deletedAt = .now
-        brew.updatedAt = .now
-        bean.updatedAt = .now
+        brew.softDelete()
+        bean.markDirty()
     }
 
     /// Mark the bag finished (or reopen it) — it moves to the shelf's Finished section, kept.
     private func toggleFinished() {
         bean.finishedAt = bean.isFinished ? nil : .now
-        bean.updatedAt = .now
+        bean.markDirty()
         Haptics.success()
     }
 
     private func deleteBean() {
-        bean.deletedAt = .now
-        bean.updatedAt = .now
+        for brew in bean.brews where brew.isActive {
+            brew.softDelete()
+        }
+        for photo in bean.photos where photo.isActive {
+            photo.softDelete()
+        }
+        bean.softDelete()
         Haptics.success()
         dismiss()
     }

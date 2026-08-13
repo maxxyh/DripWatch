@@ -4,6 +4,7 @@ import SwiftData
 /// The shelf: a balanced two-column masonry of bean character cards. Primary entry point.
 struct BeanListView: View {
     @Environment(\.modelContext) private var context
+    @EnvironmentObject private var syncEngine: SyncEngine
     @Query(sort: \Bean.updatedAt, order: .reverse) private var beans: [Bean]
     @State private var addingBean = false
     @State private var path: [UUID] = []
@@ -44,6 +45,9 @@ struct BeanListView: View {
                 }
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    syncButton
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         Haptics.tap()
@@ -56,6 +60,9 @@ struct BeanListView: View {
             }
             .sheet(isPresented: $addingBean) {
                 AddBeanView()
+            }
+            .refreshable {
+                await syncEngine.syncNow()
             }
             #if DEBUG
             .onChange(of: activeBeans.map(\.id)) { _, _ in
@@ -72,6 +79,33 @@ struct BeanListView: View {
             #endif
         }
         .tint(Theme.accent)
+    }
+
+    @ViewBuilder
+    private var syncButton: some View {
+        switch syncEngine.status {
+        case .notConfigured:
+            EmptyView()
+        case .syncing:
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel("Syncing")
+        case .idle:
+            Button {
+                Task { await syncEngine.syncNow() }
+            } label: {
+                Image(systemName: "checkmark.icloud")
+            }
+            .accessibilityLabel("Synced. Sync now")
+        case .failed:
+            Button {
+                Task { await syncEngine.syncNow() }
+            } label: {
+                Image(systemName: "exclamationmark.icloud")
+                    .foregroundStyle(Theme.accent)
+            }
+            .accessibilityLabel("Sync failed. Retry")
+        }
     }
 
     private var emptyState: some View {
@@ -140,6 +174,11 @@ struct BeanListView: View {
 }
 
 #Preview {
+    let container = try! ModelContainer(
+        for: Bean.self, BeanPhoto.self, Brew.self, Grinder.self, LexiconTerm.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
     BeanListView()
-        .modelContainer(for: [Bean.self, Brew.self, Grinder.self], inMemory: true)
+        .modelContainer(container)
+        .environmentObject(SyncEngine(context: container.mainContext))
 }

@@ -12,6 +12,7 @@ final class BeanPhoto: Syncable {
     var deletedAt: Date?
 
     var order: Int = 0
+    var remotePath: String? = nil
     @Attribute(.externalStorage) var data: Data?
 
     var bean: Bean?

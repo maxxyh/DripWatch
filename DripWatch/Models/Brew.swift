@@ -30,6 +30,7 @@ final class Brew: Syncable {
 
     /// An optional shot of the result — latte art, the crema, the cup. Stored outside the main
     /// store for size, like the bag photo. Purely for the memory; nothing depends on it.
+    var photoRemotePath: String? = nil
     @Attribute(.externalStorage) var photo: Data?
 
     var bean: Bean?
