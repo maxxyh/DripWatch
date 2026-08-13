@@ -25,7 +25,8 @@ rotating the session secret invalidates every session. Configure Vercel Firewall
 ## Vercel and offline behavior
 
 Create a separate Vercel project rooted at `web/`, select Node 22+, and configure the four
-variables. No database schema change is required.
+variables. `web/vercel.json` pins the Next.js framework preset so a project first created through
+the CLI does not inherit the static “Other” output behavior. No database schema change is required.
 
 The standalone manifest derives its icons from the native app. The service worker uses cache-first
 for immutable assets and network-first fallback for the last notebook snapshot and viewed photos.
