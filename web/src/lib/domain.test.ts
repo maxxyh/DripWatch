@@ -1,0 +1,132 @@
+import { describe, expect, it } from "vitest";
+import {
+  asPlanSeed,
+  brewDiff,
+  effectiveWater,
+  grindDisplay,
+  grinderMutationSchema,
+  newPourover,
+  normalizeTerm,
+  normalizeTerms,
+  recipeSchema,
+  reconcileWater,
+  setTotalWater,
+  suggestedTargets,
+  tasteSchema,
+  type Recipe,
+} from "./domain";
+describe("Swift recipe parity", () => {
+  it("starts a pourover with native defaults", () =>
+    expect(newPourover()).toMatchObject({
+      waterTempC: 92,
+      bloomTimeSec: 30,
+      ratio: 15,
+      pourCount: 3,
+      pours: [],
+    }));
+  it("reconciles exact total water through ratio", () => {
+    let r: Recipe = { pours: [], doseGrams: 15 };
+    r = setTotalWater(r, 220);
+    expect(effectiveWater(r)).toBeCloseTo(220);
+    expect(r.totalWaterGrams).toBeUndefined();
+  });
+  it("folds a total entered before dose", () => {
+    let r = setTotalWater({ pours: [] }, 240);
+    r = reconcileWater({ ...r, doseGrams: 15 });
+    expect(r).toMatchObject({ doseGrams: 15, ratio: 16 });
+    expect(r.totalWaterGrams).toBeUndefined();
+  });
+  it("suggests bloom-aware cumulative targets and preserves exact total", () => {
+    expect(
+      suggestedTargets({ pours: [], doseGrams: 15, ratio: 16 }, 4),
+    ).toEqual([45, 110, 175, 240]);
+    const t = suggestedTargets(
+      setTotalWater({ pours: [], doseGrams: 15 }, 223),
+      4,
+    );
+    expect(t.at(-1)).toBeCloseTo(223);
+  });
+  it("drops measured outcomes from a plan seed", () =>
+    expect(
+      asPlanSeed({
+        pours: [],
+        shotTimeSec: 28,
+        totalDrawdownSec: 135,
+        doseGrams: 18,
+      }),
+    ).toEqual({
+      pours: [],
+      shotTimeSec: undefined,
+      totalDrawdownSec: undefined,
+      doseGrams: 18,
+    }));
+});
+describe("instrument formatting and diffs", () => {
+  it("shows absolute signed grind", () =>
+    expect(
+      grindDisplay({ grinderName: "1Zpresso J", major: 3, clickOffset: -1 }),
+    ).toBe("1Zpresso J · 3(−1)"));
+  it("only asserts click direction on the same grinder dial", () => {
+    expect(
+      brewDiff(
+        { pours: [], grinderName: "J", grindMajor: 3, grindClickOffset: 0 },
+        { pours: [], grinderName: "J", grindMajor: 3, grindClickOffset: -1 },
+      ),
+    ).toContain("1 click coarser");
+    expect(
+      brewDiff(
+        { pours: [], grinderName: "J", grindMajor: 3, grindClickOffset: 0 },
+        { pours: [], grinderName: "J", grindMajor: 2, grindClickOffset: 0 },
+      )[0],
+    ).toBe("grind 3 → 2");
+  });
+  it("normalizes and deduplicates taste terms", () =>
+    expect(normalizeTerms([" honey ", "HONEY", "red plum", "RED TEA"])).toEqual(
+      ["Honey", "Red Plum", "RED TEA"],
+    ));
+  it("matches native normalization for digit codes and four-letter acronyms", () => {
+    expect(normalizeTerm("  usda   tha1 sl-34 pink BOURBON  ")).toBe(
+      "Usda tha1 Sl-34 Pink Bourbon",
+    );
+    expect(normalizeTerm("USDA THA1 SL-34 pink bourbon")).toBe(
+      "USDA THA1 SL-34 Pink Bourbon",
+    );
+    expect(normalizeTerms([" USDA ", "usda", "", "THA1", "tha1"])).toEqual([
+      "USDA",
+      "THA1",
+    ]);
+  });
+});
+describe("Swift JSON contracts", () => {
+  it("accepts representative camelCase recipe and required pour UUID", () =>
+    expect(
+      recipeSchema.parse({
+        grinderName: "J",
+        grindMajor: 3,
+        grindClickOffset: -1,
+        waterTempC: 92,
+        pours: [
+          { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", order: 1, toGrams: 45 },
+        ],
+      }).pours,
+    ).toHaveLength(1));
+  it("requires taste arrays and balance", () => {
+    expect(() => tasteSchema.parse({ balance: {} })).toThrow();
+    expect(
+      tasteSchema.parse({ positives: [], negatives: [], balance: {} }),
+    ).toBeTruthy();
+  });
+  it("accepts safe grinder inserts and partial updates", () => {
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    expect(
+      grinderMutationSchema.parse({ id, name: "DF54", stepless: true }),
+    ).toEqual({ id, name: "DF54", stepless: true });
+    expect(grinderMutationSchema.parse({ id, stepless: false })).toEqual({
+      id,
+      stepless: false,
+    });
+    expect(() =>
+      grinderMutationSchema.parse({ id, stepless: "yes" }),
+    ).toThrow();
+  });
+});

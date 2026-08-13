@@ -44,6 +44,7 @@ DesignSystem/               Theme, layouts, DEBUG sample data
 DripWatchTests/             Swift Testing suites, including sync transport/DTO/outbox coverage
 supabase/                   Declarative hosted schema, backup docs, launchd template
 scripts/                    Operational scripts
+web/                        Next.js PWA, guarded API boundary, domain tests, PWA assets
 ```
 
 The project uses Xcode 16 synchronized file groups; Swift files added under `DripWatch/` are
@@ -60,6 +61,11 @@ xcodebuild -project DripWatch.xcodeproj -scheme DripWatch \
 
 xcodebuild test -project DripWatch.xcodeproj -scheme DripWatch \
   -destination 'platform=iOS Simulator,name=iPhone 16'
+
+cd web
+npm ci
+npm run typecheck && npm run lint && npm test && npm run build
+npm run test:e2e
 ```
 
 DEBUG launch arguments: `-seedSampleData 1`, `-openFirstBean 1`, `-openEspressoBean 1`,
@@ -85,5 +91,6 @@ work, also verify against the real Supabase project and run security/performance
 
 - [Supabase sync architecture and operations](docs/supabase-sync.md)
 - [Engineering process and session learnings](docs/engineering-process.md)
+- [Web PWA setup, deployment, security, and offline behavior](docs/web-pwa.md)
 - [Supabase schema and setup](supabase/README.md)
 - [Backup and restore runbook](supabase/backup/README.md)

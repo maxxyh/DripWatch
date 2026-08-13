@@ -1,0 +1,1 @@
+import { BrewEditor } from "@/components/brew-editor"; export default async function NewBrew({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{method?:string}>}){const method=(await searchParams).method==="espresso"?"espresso":"pourover";return <BrewEditor beanId={(await params).id} initialMethod={method}/>}

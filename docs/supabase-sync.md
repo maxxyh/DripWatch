@@ -14,6 +14,12 @@ The app uses a modern Supabase publishable key. Publishable configuration is exp
 in a client; authorization belongs in RLS. A `service_role`, secret key, database password, or
 backup connection URL must never be compiled into the app or committed.
 
+The Next.js PWA under `web/` keeps the URL and publishable/legacy anonymous key server-side and
+proxies notebook and private-photo access through signed-passcode session routes. Embedded
+`Recipe`, `Pour`, `Taste`, and `TasteBalance` JSON retains Swift `Codable` camelCase keys; table
+columns remain snake_case. Reads paginate in stable 500-row pages. The browser never receives a
+Supabase key or direct Storage URL.
+
 ## Security boundary
 
 This is deliberately a **no-auth shared-notebook prototype**. The `anon` role can select,
@@ -21,6 +27,12 @@ insert, and update every DripWatch row and object; no hard-delete grant exists. 
 extracts the URL and publishable key can read or alter the notebook. This is acceptable only for
 the current hobby scope. Add authentication, ownership columns, and ownership-scoped RLS before
 wider distribution or sensitive use.
+
+The web passcode protects the interface but is **not a complete Supabase security boundary**.
+Anonymous policies remain because iOS depends on them, the passcode provides no per-user
+permissions, and offline snapshots reside on the device. Migrate both clients to authenticated
+notebook membership and ownership-based RLS, then revoke anonymous grants, before sensitive or
+multi-tenant use.
 
 All exposed tables have RLS enabled and explicit grants/policies. Storage policies are scoped to
 the two private buckets. Keep SELECT + INSERT + UPDATE for Storage because object upsert requires
@@ -39,6 +51,21 @@ all three. Run Supabase security and performance advisors after every DDL/policy
 Last-writer-wins is row-granular, not field-granular. Two people editing different fields of the
 same row concurrently can still overwrite one another. Revisit this before the collaborative web
 app becomes heavily used.
+
+Web mutations additionally carry the exact raw `updated_at` originally loaded and conditionally
+match both it and `id`. A zero-row update is returned as a stale-write conflict so the editor
+refreshes instead of silently replacing a newer iOS or web edit. Inserts cannot overwrite an
+existing UUID. This leaves the database's row-level last-writer-wins behavior unchanged for iOS.
+
+Web photo uploads follow the existing 1400px JPEG normalization and lowercase
+`<record-id>/<sha256>.jpg` path convention. The object uploads before its row is written. Data API
+multi-row flows are not transactional, so idempotent client UUIDs, parent-before-child ordering,
+and refresh/reconciliation limit partial-write risk; replaced objects can still be orphaned. A
+guarded photo read resolves the record by UUID and serves bytes only when its active row references
+the exact canonical path.
+The upload proxy independently decodes and verifies JPEG dimensions rather than trusting browser
+normalization alone. Offline photo storage retains at most 120 viewed objects and approximately
+100 MB for the active signed-session scope.
 
 ## Durable synchronization flow
 
