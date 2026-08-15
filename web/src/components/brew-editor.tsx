@@ -102,6 +102,13 @@ export function BrewEditor({
           brewUpdatedAt.current = brew.updated_at;
           setMethod(brew.method_raw);
           setRecipe(brew.recipe);
+          setElapsed(
+            brew.recipe[
+              brew.method_raw === "pourover"
+                ? "totalDrawdownSec"
+                : "shotTimeSec"
+            ] ?? 0,
+          );
           setTaste(brew.taste);
           setBrewedAt(brew.brewed_at);
           originalPhotoPath.current = brew.photo_path;
@@ -138,7 +145,7 @@ export function BrewEditor({
             .sort((a, b) => b.brewed_at.localeCompare(a.brewed_at))[0];
         const seed =
           pending ??
-          prior?.recipe ??
+          (prior ? asPlanSeed(prior.recipe) : undefined) ??
           (initialMethod === "pourover" ? newPourover() : emptyRecipe());
         setRecipe(seed);
         setNext(asPlanSeed(seed));
