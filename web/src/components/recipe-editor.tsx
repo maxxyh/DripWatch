@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { NumericStepper } from "./numeric-stepper";
 import type { GrinderRow, Recipe } from "@/lib/domain";
 import {
   effectiveWater,
@@ -32,7 +33,6 @@ import {
   suggestedTargets,
 } from "@/lib/domain";
 import { mutate } from "@/lib/client-mutations";
-const number = (value: string) => (value === "" ? undefined : Number(value));
 function reflowPours(recipe: Recipe, count = recipe.pourCount ?? 0): Recipe {
   if (count <= 0) return recipe;
   const targets = suggestedTargets(recipe, count);
@@ -138,13 +138,13 @@ export function RecipeEditor({
     )
       onChange(reflowPours(recipe, recipe.pourCount));
   }, [method, onChange, recipe]);
-  const changeDose = (v: string) => {
-    const next = reconcileWater({ ...recipe, doseGrams: number(v) });
+  const changeDose = (value?: number) => {
+    const next = reconcileWater({ ...recipe, doseGrams: value });
     onChange(reflowPours(next));
   };
-  const changeCount = (v: string) => {
-    const count = Math.max(1, Math.min(12, Number(v) || 1));
-    onChange(reflowPours(recipe, count));
+  const changeCount = (value?: number) => {
+    if (value === undefined) return onChange({ ...recipe, pourCount: undefined });
+    onChange(reflowPours(recipe, Math.max(1, Math.min(12, value))));
   };
   return (
     <div className="flex flex-col gap-4">
@@ -197,12 +197,13 @@ export function RecipeEditor({
               </Field>
               <Field>
                 <FieldLabel htmlFor="dial">Dial</FieldLabel>
-                <Input
+                <NumericStepper
                   id="dial"
-                  type="number"
-                  step="0.1"
-                  value={recipe.grindMajor ?? ""}
-                  onChange={(e) => set("grindMajor", number(e.target.value))}
+                  step={0.1}
+                  min={0}
+                  max={60}
+                  value={recipe.grindMajor}
+                  onChange={(value) => set("grindMajor", value)}
                 />
               </Field>
             </div>
@@ -228,57 +229,49 @@ export function RecipeEditor({
               <FieldLabel htmlFor="clicks">
                 Clicks from dial (+ finer / − coarser)
               </FieldLabel>
-              <Input
+              <NumericStepper
                 id="clicks"
-                type="number"
-                min="-30"
-                max="30"
+                min={-30}
+                max={30}
                 disabled={selectedGrinder?.stepless}
-                value={recipe.grindClickOffset ?? 0}
-                onChange={(e) =>
-                  set("grindClickOffset", Number(e.target.value))
-                }
+                value={recipe.grindClickOffset}
+                onChange={(value) => set("grindClickOffset", value)}
               />
             </Field>
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <FieldLabel htmlFor="dose">Dose (g)</FieldLabel>
-                <Input
+                <NumericStepper
                   id="dose"
-                  inputMode="decimal"
-                  type="number"
-                  step="0.1"
-                  value={recipe.doseGrams ?? ""}
-                  onChange={(e) => changeDose(e.target.value)}
+                  step={0.1}
+                  min={0}
+                  value={recipe.doseGrams}
+                  onChange={changeDose}
                 />
               </Field>
               {method === "pourover" ? (
                 <>
                   <Field>
                     <FieldLabel htmlFor="temp">Water (°C)</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id="temp"
-                      inputMode="numeric"
-                      type="number"
-                      value={recipe.waterTempC ?? ""}
-                      onChange={(e) =>
-                        set("waterTempC", number(e.target.value))
-                      }
+                      min={0}
+                      value={recipe.waterTempC}
+                      onChange={(value) => set("waterTempC", value)}
                     />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="ratio">Ratio 1:</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id="ratio"
-                      inputMode="decimal"
-                      type="number"
-                      step="0.1"
-                      value={recipe.ratio ?? ""}
-                      onChange={(e) =>
+                      step={0.1}
+                      min={0}
+                      value={recipe.ratio}
+                      onChange={(value) =>
                         onChange(
                           reflowPours({
                             ...recipe,
-                            ratio: number(e.target.value),
+                            ratio: value,
                           }),
                         )
                       }
@@ -286,16 +279,15 @@ export function RecipeEditor({
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="water">Total water (g)</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id="water"
-                      inputMode="decimal"
-                      type="number"
-                      step="0.1"
-                      value={effectiveWater(recipe) ?? ""}
-                      onChange={(e) =>
+                      step={0.1}
+                      min={0}
+                      value={effectiveWater(recipe)}
+                      onChange={(value) =>
                         onChange(
                           reflowPours(
-                            setTotalWater(recipe, number(e.target.value)),
+                            setTotalWater(recipe, value),
                           ),
                         )
                       }
@@ -303,24 +295,21 @@ export function RecipeEditor({
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="pours">Pours</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id="pours"
-                      type="number"
-                      min="1"
-                      max="12"
-                      value={recipe.pourCount ?? ""}
-                      onChange={(e) => changeCount(e.target.value)}
+                      min={1}
+                      max={12}
+                      value={recipe.pourCount}
+                      onChange={changeCount}
                     />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="bloom">Bloom (sec)</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id="bloom"
-                      type="number"
-                      value={recipe.bloomTimeSec ?? ""}
-                      onChange={(e) =>
-                        set("bloomTimeSec", number(e.target.value))
-                      }
+                      min={0}
+                      value={recipe.bloomTimeSec}
+                      onChange={(value) => set("bloomTimeSec", value)}
                     />
                   </Field>
                 </>
@@ -328,25 +317,21 @@ export function RecipeEditor({
                 <>
                   <Field>
                     <FieldLabel htmlFor="espresso-temp">Water (°C)</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id="espresso-temp"
-                      type="number"
-                      value={recipe.waterTempC ?? ""}
-                      onChange={(event) =>
-                        set("waterTempC", number(event.target.value))
-                      }
+                      min={0}
+                      value={recipe.waterTempC}
+                      onChange={(value) => set("waterTempC", value)}
                     />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="yield">Yield (g)</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id="yield"
-                      type="number"
-                      step="0.1"
-                      value={recipe.yieldGrams ?? ""}
-                      onChange={(e) =>
-                        set("yieldGrams", number(e.target.value))
-                      }
+                      step={0.1}
+                      min={0}
+                      value={recipe.yieldGrams}
+                      onChange={(value) => set("yieldGrams", value)}
                     />
                   </Field>
                 </>
@@ -375,15 +360,15 @@ export function RecipeEditor({
                   </strong>
                   <Field>
                     <FieldLabel htmlFor={`pour-${i}`}>To grams</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id={`pour-${i}`}
-                      type="number"
-                      step="0.1"
-                      value={pour.toGrams ?? ""}
-                      onChange={(e) => {
+                      step={0.1}
+                      min={0}
+                      value={pour.toGrams}
+                      onChange={(grams) => {
                         const pours = [...recipe.pours],
-                          grams = number(e.target.value);
-                        pours[i] = { ...pour, toGrams: grams };
+                          nextPour = { ...pour, toGrams: grams };
+                        pours[i] = nextPour;
                         onChange(
                           i === pours.length - 1
                             ? reflowPours(
@@ -396,15 +381,15 @@ export function RecipeEditor({
                   </Field>
                   <Field>
                     <FieldLabel htmlFor={`start-${i}`}>Start sec</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id={`start-${i}`}
-                      type="number"
-                      value={pour.startSec ?? ""}
-                      onChange={(e) => {
+                      min={0}
+                      value={pour.startSec}
+                      onChange={(value) => {
                         const pours = [...recipe.pours];
                         pours[i] = {
                           ...pour,
-                          startSec: number(e.target.value),
+                          startSec: value,
                         };
                         onChange({ ...recipe, pours });
                       }}
@@ -412,15 +397,15 @@ export function RecipeEditor({
                   </Field>
                   <Field>
                     <FieldLabel htmlFor={`end-${i}`}>End sec</FieldLabel>
-                    <Input
+                    <NumericStepper
                       id={`end-${i}`}
-                      type="number"
-                      value={pour.endSec ?? ""}
-                      onChange={(event) => {
+                      min={0}
+                      value={pour.endSec}
+                      onChange={(value) => {
                         const pours = [...recipe.pours];
                         pours[i] = {
                           ...pour,
-                          endSec: number(event.target.value),
+                          endSec: value,
                         };
                         onChange({ ...recipe, pours });
                       }}
@@ -466,35 +451,29 @@ export function RecipeEditor({
                   <div className="grid grid-cols-3 gap-3">
                     <Field>
                       <FieldLabel htmlFor="pre">Pre-infuse</FieldLabel>
-                      <Input
+                      <NumericStepper
                         id="pre"
-                        type="number"
-                        value={recipe.preInfusionSec ?? ""}
-                        onChange={(e) =>
-                          set("preInfusionSec", number(e.target.value))
-                        }
+                        min={0}
+                        value={recipe.preInfusionSec}
+                        onChange={(value) => set("preInfusionSec", value)}
                       />
                     </Field>
                     <Field>
                       <FieldLabel htmlFor="surf">Surf wait</FieldLabel>
-                      <Input
+                      <NumericStepper
                         id="surf"
-                        type="number"
-                        value={recipe.surfWaitSec ?? ""}
-                        onChange={(e) =>
-                          set("surfWaitSec", number(e.target.value))
-                        }
+                        min={0}
+                        value={recipe.surfWaitSec}
+                        onChange={(value) => set("surfWaitSec", value)}
                       />
                     </Field>
                     <Field>
                       <FieldLabel htmlFor="steam">Steam mode</FieldLabel>
-                      <Input
+                      <NumericStepper
                         id="steam"
-                        type="number"
-                        value={recipe.steamModeSec ?? ""}
-                        onChange={(e) =>
-                          set("steamModeSec", number(e.target.value))
-                        }
+                        min={0}
+                        value={recipe.steamModeSec}
+                        onChange={(value) => set("steamModeSec", value)}
                       />
                     </Field>
                   </div>

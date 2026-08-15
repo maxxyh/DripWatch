@@ -16,7 +16,8 @@ needed. Keep this file concise; put durable topic detail in `docs/<topic>.md` an
 
 - Pourover first; espresso capture is also method-aware.
 - The bean is the hero: bag photos plus roaster facts form its character card.
-- One reusable `RecipeEditor`; a brew owns a recipe and its planned next brew is a draft recipe.
+- One reusable `RecipeEditor`; a brew owns its recipe, while a bean has at most one active
+  planned-next-brew draft across both methods.
 - Grind is absolute and reproducible: `grinder · dial(±clicks)`. Deltas are annotations only.
 - Structured but progressive: everyday recipe line first, detail only when requested.
 - Meaning is never color-only. Preserve Dynamic Type, ≥44pt targets, semantic colors, and

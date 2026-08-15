@@ -38,16 +38,20 @@ mode is persistently read-only. Reconnect reloads server state before editing. L
 local snapshot, expires the cookie, and purges protected caches. Cached data is not encrypted at
 rest; avoid installing on an untrusted shared device.
 
-Core web mutations use client UUIDs and soft deletion. Starting a new brew inserts its row and
-consumes the method-specific pending plan before the timer/taste phases become reachable. Bean
+Core web mutations use client UUIDs and soft deletion. A bean has at most one active planned next
+brew across both methods; creating or updating one method's plan clears the other method slot.
+The plan appears once above the bean history, never as a card attached to an individual historical
+brew. Starting a new brew inserts its row and consumes the matching pending plan before the
+timer/taste phases become reachable. Bean
 deletion soft-deletes its active brews and photo rows before the parent; this multi-row flow is
 recoverable but not transactionally atomic through PostgREST. Bean and brew photos are normalized
 in the browser and guarded by canonical, record-linked proxy paths. Replacement objects may remain
 orphaned after a later stale-write conflict and must not be deleted speculatively.
 
-Once a brew is started, its date, recipe, observed time, taste, photo reference, and next-brew
-draft autosave with stale-write guards. The newest brew of each method also keeps the bean's
-method-specific pending plan synchronized. Brewing mode retains the absolute recipe, cumulative
+Once a brew is started, its date, recipe, observed time, taste, and photo reference autosave with
+stale-write guards. Planning from the newest brew updates the bean's single active pending plan;
+the legacy per-brew `next_recipe_draft` field is no longer used by the PWA. Brewing mode retains
+the absolute recipe, cumulative
 pour targets and timing/style details, manual espresso technique, and roaster notes; history uses
 the same persisted pour rows rather than regenerating them.
 
@@ -55,7 +59,10 @@ Bean edits use the same term normalization as iOS: fact fields are title-cased w
 codes and short uppercase acronyms keep their spelling, comma lists are case-insensitively deduped,
 and roaster brand casing is preserved. Saved and newly selected bag photos share one ordered draft,
 so the hero order is visible before save. `RecipeEditor` also remembers newly typed grinders and
-their stepped/stepless classification through the guarded mutation API.
+their stepped/stepless classification through the guarded mutation API. Numeric recipe controls
+use iOS-style decrement/increment buttons and mobile numeric keypads; signed controls retain
+negative entry. Observed drawdown and shot time use the native digit-entry convention, so `230`
+becomes `2:30` while the stopwatch remains available.
 
 Photo uploads are also decoded at the server boundary and rejected unless they are valid JPEGs
 whose width and height are both at most 1400 pixels. Supabase database definitions in

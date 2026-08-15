@@ -65,6 +65,7 @@ import {
   grind,
   grindDisplay,
   recipeSummary,
+  singlePendingPlanPatch,
   suggestedTargets,
   timeText,
 } from "@/lib/domain";
@@ -484,6 +485,11 @@ function BeanDetail({
   const photos = data.beanPhotos
     .filter((p) => !p.deleted_at && p.bean_id === bean.id)
     .sort((a, b) => a.order - b.order);
+  const pendingPlan = bean.pending_next_pourover
+    ? { method: "pourover" as const, recipe: bean.pending_next_pourover }
+    : bean.pending_next_espresso
+      ? { method: "espresso" as const, recipe: bean.pending_next_espresso }
+      : null;
   async function toggleFinished() {
     if (!bean || working) return;
     setWorking(true);
@@ -609,22 +615,13 @@ function BeanDetail({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(21rem,.95fr)]">
         <section className="flex flex-col gap-4">
           <CharacterCard bean={bean} photos={photos} />
-          {bean.pending_next_pourover && (
+          {pendingPlan && (
             <PlanCard
-              method="pourover"
-              recipe={bean.pending_next_pourover}
-              prior={brews.find((b) => b.method_raw === "pourover")?.recipe}
-              bean={bean}
-              data={data}
-              offline={offline}
-              refresh={refresh}
-            />
-          )}{" "}
-          {bean.pending_next_espresso && (
-            <PlanCard
-              method="espresso"
-              recipe={bean.pending_next_espresso}
-              prior={brews.find((b) => b.method_raw === "espresso")?.recipe}
+              method={pendingPlan.method}
+              recipe={pendingPlan.recipe}
+              prior={
+                brews.find((b) => b.method_raw === pendingPlan.method)?.recipe
+              }
               bean={bean}
               data={data}
               offline={offline}
@@ -841,8 +838,6 @@ function PlanCard({
   const beanToken = useRef(bean.updated_at);
   const planQueue = useRef<Promise<unknown>>(Promise.resolve());
   const changes = prior ? brewDiff(prior, recipe) : [];
-  const key =
-    method === "pourover" ? "pending_next_pourover" : "pending_next_espresso";
   useEffect(() => {
     beanToken.current = bean.updated_at;
   }, [bean.updated_at]);
@@ -851,7 +846,7 @@ function PlanCard({
       const job = planQueue.current.then(async () => {
         const updated = (await mutate(
           "beans",
-          { id: bean.id, [key]: value },
+          { id: bean.id, ...singlePendingPlanPatch(method, value) },
           beanToken.current,
         )) as BeanRow;
         beanToken.current = updated.updated_at;
@@ -860,7 +855,7 @@ function PlanCard({
       planQueue.current = job.catch(() => undefined);
       return job;
     },
-    [bean.id, key],
+    [bean.id, method],
   );
   useEffect(() => {
     if (!editing || offline) return;
@@ -1196,14 +1191,6 @@ function HistoryCard({
               .map(([axis, value]) => `${axis} ${value}/5`)
               .join(" · ")}
           </p>
-        )}
-        {brew.next_recipe_draft && (
-          <div className="rounded-lg border border-dashed border-primary/40 p-3">
-            <p className="mb-2 text-xs font-semibold text-primary">
-              Planned next brew
-            </p>
-            <RecipeReadout recipe={brew.next_recipe_draft} />
-          </div>
         )}
       </CardContent>
     </Card>

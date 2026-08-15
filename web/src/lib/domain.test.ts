@@ -10,6 +10,9 @@ import {
   normalizeTerms,
   recipeSchema,
   reconcileWater,
+  liveTimeEntry,
+  secondsFromDigits,
+  singlePendingPlanPatch,
   setTotalWater,
   suggestedTargets,
   tasteSchema,
@@ -95,6 +98,29 @@ describe("instrument formatting and diffs", () => {
       "USDA",
       "THA1",
     ]);
+  });
+});
+describe("native input behavior", () => {
+  it("treats the last two digits as seconds", () => {
+    expect(secondsFromDigits("45")).toBe(45);
+    expect(secondsFromDigits("230")).toBe(150);
+    expect(secondsFromDigits("12:30")).toBe(750);
+    expect(secondsFromDigits("")).toBeUndefined();
+  });
+  it("formats time entry live and caps it at four digits", () => {
+    expect(liveTimeEntry("00210")).toEqual({ text: "2:10", seconds: 130 });
+    expect(liveTimeEntry("12345")).toEqual({ text: "12:34", seconds: 754 });
+  });
+  it("keeps exactly one bean-level pending plan", () => {
+    const draft: Recipe = { pours: [], doseGrams: 20 };
+    expect(singlePendingPlanPatch("pourover", draft)).toEqual({
+      pending_next_pourover: draft,
+      pending_next_espresso: null,
+    });
+    expect(singlePendingPlanPatch("espresso", null)).toEqual({
+      pending_next_pourover: null,
+      pending_next_espresso: null,
+    });
   });
 });
 describe("Swift JSON contracts", () => {

@@ -191,6 +191,26 @@ export const gramText = (n: number) =>
   Number.isInteger(n) ? String(n) : n.toFixed(1);
 export const timeText = (n: number) =>
   `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+export function secondsFromDigits(raw: string) {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return undefined;
+  if (digits.length <= 2) return Number(digits);
+  return Number(digits.slice(0, -2)) * 60 + Number(digits.slice(-2));
+}
+export function liveTimeEntry(raw: string) {
+  const digits = raw.replace(/\D/g, "").replace(/^0+/, "").slice(0, 4);
+  const seconds = secondsFromDigits(digits);
+  return { text: seconds === undefined ? "" : timeText(seconds), seconds };
+}
+export function singlePendingPlanPatch(
+  method: "pourover" | "espresso",
+  draft: Recipe | null,
+) {
+  return {
+    pending_next_pourover: method === "pourover" ? draft : null,
+    pending_next_espresso: method === "espresso" ? draft : null,
+  };
+}
 export function grindDisplay(g: GrindSetting, includeName = true) {
   const major = Number.isInteger(g.major)
     ? String(g.major)

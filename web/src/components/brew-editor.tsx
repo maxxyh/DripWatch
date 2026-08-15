@@ -24,6 +24,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { RecipeEditor } from "./recipe-editor";
+import { NumericStepper } from "./numeric-stepper";
+import { TimeInput } from "./time-input";
 import { fetchNotebook, mutate, normalizePhoto } from "@/lib/client-mutations";
 import {
   asPlanSeed,
@@ -33,6 +35,7 @@ import {
   newPourover,
   normalizeTerms,
   recipeSummary,
+  singlePendingPlanPatch,
   suggestedTargets,
   timeText,
   type BeanRow,
@@ -102,9 +105,23 @@ export function BrewEditor({
           setTaste(brew.taste);
           setBrewedAt(brew.brewed_at);
           originalPhotoPath.current = brew.photo_path;
-          setPlan(!!brew.next_recipe_draft);
-          setPlanSeeded(!!brew.next_recipe_draft);
-          setNext(brew.next_recipe_draft ?? asPlanSeed(brew.recipe));
+          const pending =
+              brew.method_raw === "pourover"
+                ? b.pending_next_pourover
+                : b.pending_next_espresso,
+            latestBrew = n.brews
+              .filter(
+                (candidate) =>
+                  !candidate.deleted_at &&
+                  candidate.bean_id === b.id,
+              )
+              .sort((left, right) =>
+                right.brewed_at.localeCompare(left.brewed_at),
+              )[0],
+            activePlan = latestBrew?.id === brew.id ? pending : null;
+          setPlan(!!activePlan);
+          setPlanSeeded(!!activePlan);
+          setNext(activePlan ?? asPlanSeed(brew.recipe));
           return;
         }
         const pending =
@@ -158,19 +175,14 @@ export function BrewEditor({
         (candidate) =>
           !candidate.deleted_at &&
           candidate.bean_id === bean.id &&
-          candidate.method_raw === method &&
           candidate.id !== existing.id &&
           candidate.brewed_at > currentBrewedAt,
       );
       if (!isNewest) return Promise.resolve(null);
-      const key =
-        method === "pourover"
-          ? "pending_next_pourover"
-          : "pending_next_espresso";
       const job = beanQueue.current.then(async () => {
         const updated = (await mutate(
           "beans",
-          { id: bean.id, [key]: draft },
+          { id: bean.id, ...singlePendingPlanPatch(method, draft) },
           beanUpdatedAt.current ?? bean.updated_at,
         )) as BeanRow;
         beanUpdatedAt.current = updated.updated_at;
@@ -192,7 +204,7 @@ export function BrewEditor({
           recipe,
           taste,
           brewed_at: brewedAt,
-          next_recipe_draft: plan ? next : null,
+          next_recipe_draft: null,
         });
         await syncPendingPlan(plan ? next : null, brewedAt);
       } catch (error) {
@@ -254,6 +266,13 @@ export function BrewEditor({
     .sort((a, b) => b.brewed_at.localeCompare(a.brewed_at))
     .slice(0, 3)
     .map((candidate) => candidate.taste);
+  const canPlanNext = !book.brews.some(
+    (candidate) =>
+      !candidate.deleted_at &&
+      candidate.bean_id === activeBean.id &&
+      candidate.id !== existing?.id &&
+      candidate.brewed_at > brewedAt,
+  );
   function addTerm(value: string, positive: boolean) {
     const term = value.trim();
     if (!term) return;
@@ -326,7 +345,12 @@ export function BrewEditor({
           : "pending_next_espresso";
       const updatedBean = (await mutate(
         "beans",
-        { id: activeBean.id, [key]: null },
+        {
+          id: activeBean.id,
+          ...(activeBean[key]
+            ? singlePendingPlanPatch(method, null)
+            : { [key]: null }),
+        },
         activeBean.updated_at,
       )) as BeanRow;
       setBean(updatedBean);
@@ -395,7 +419,7 @@ export function BrewEditor({
           brewed_at: brewedAt,
           recipe: observed,
           taste,
-          next_recipe_draft: plan ? next : null,
+          next_recipe_draft: null,
           photo_path: photoPath,
         });
       } else {
@@ -409,7 +433,7 @@ export function BrewEditor({
           brewers: [],
           recipe: observed,
           taste,
-          next_recipe_draft: plan ? next : null,
+          next_recipe_draft: null,
           photo_path: photoPath,
           bean_id: activeBean.id,
         });
@@ -418,18 +442,16 @@ export function BrewEditor({
         (b) =>
           !b.deleted_at &&
           b.bean_id === activeBean.id &&
-          b.method_raw === method &&
           b.id !== id &&
           b.brewed_at > brewedAt,
       );
       if (isNewest) {
-        const key =
-          method === "pourover"
-            ? "pending_next_pourover"
-            : "pending_next_espresso";
         const updatedBean = (await mutate(
           "beans",
-          { id: activeBean.id, [key]: plan ? next : null },
+          {
+            id: activeBean.id,
+            ...singlePendingPlanPatch(method, plan ? next : null),
+          },
           beanUpdatedAt.current ?? activeBean.updated_at,
         )) as BeanRow;
         beanUpdatedAt.current = updatedBean.updated_at;
@@ -594,32 +616,29 @@ export function BrewEditor({
             <CardContent className="grid grid-cols-2 gap-3 border-t pt-4">
               <Field>
                 <FieldLabel htmlFor="observed-time">
-                  {method === "pourover" ? "Drawdown seconds" : "Shot seconds"}
+                  {method === "pourover" ? "Drawdown time" : "Shot time"}
                 </FieldLabel>
-                <Input
+                <TimeInput
                   id="observed-time"
-                  type="number"
-                  min="0"
-                  value={Math.round(elapsed) || ""}
-                  onChange={(event) =>
-                    setElapsed(Math.max(0, Number(event.target.value) || 0))
-                  }
+                  seconds={Math.round(elapsed) || undefined}
+                  onChange={(seconds) => setElapsed(seconds ?? 0)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Type 230 for 2:30.
+                </p>
               </Field>
               {method === "espresso" && (
                 <Field>
                   <FieldLabel htmlFor="live-yield">Yield (g)</FieldLabel>
-                  <Input
+                  <NumericStepper
                     id="live-yield"
-                    type="number"
-                    step="0.1"
-                    value={recipe.yieldGrams ?? ""}
-                    onChange={(event) =>
+                    step={0.1}
+                    min={0}
+                    value={recipe.yieldGrams}
+                    onChange={(value) =>
                       setRecipe({
                         ...recipe,
-                        yieldGrams: event.target.value
-                          ? Number(event.target.value)
-                          : undefined,
+                        yieldGrams: value,
                       })
                     }
                   />
@@ -698,40 +717,42 @@ export function BrewEditor({
               </FieldGroup>
             </CardContent>
           </Card>
-          <Card className="border-primary/40 bg-primary/5 [border-style:dashed]">
-            <CardHeader>
-              <CardTitle>Plan the next {method}</CardTitle>
-              <CardDescription>
-                Measured shot time and drawdown are never carried forward
-                automatically.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ToggleGroup
-                value={plan ? ["plan"] : []}
-                onValueChange={(v) => {
-                  const on = v.includes("plan");
-                  setPlan(on);
-                  if (on && !planSeeded) {
-                    setNext(asPlanSeed(recipe));
-                    setPlanSeeded(true);
-                  }
-                }}
-              >
-                <ToggleGroupItem value="plan">Plan next brew</ToggleGroupItem>
-              </ToggleGroup>
-              {plan && (
-                <div className="mt-4">
-                  <RecipeEditor
-                    recipe={next}
-                    onChange={setNext}
-                    method={method}
-                    grinders={book.grinders.filter((g) => !g.deleted_at)}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {canPlanNext && (
+            <Card className="border-primary/40 bg-primary/5 [border-style:dashed]">
+              <CardHeader>
+                <CardTitle>Plan the next {method}</CardTitle>
+                <CardDescription>
+                  Measured shot time and drawdown are never carried forward
+                  automatically.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ToggleGroup
+                  value={plan ? ["plan"] : []}
+                  onValueChange={(v) => {
+                    const on = v.includes("plan");
+                    setPlan(on);
+                    if (on && !planSeeded) {
+                      setNext(asPlanSeed(recipe));
+                      setPlanSeeded(true);
+                    }
+                  }}
+                >
+                  <ToggleGroupItem value="plan">Plan next brew</ToggleGroupItem>
+                </ToggleGroup>
+                {plan && (
+                  <div className="mt-4">
+                    <RecipeEditor
+                      recipe={next}
+                      onChange={setNext}
+                      method={method}
+                      grinders={book.grinders.filter((g) => !g.deleted_at)}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
       <div className="sticky bottom-0 mt-5 flex gap-3 border-t bg-background/95 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur">
