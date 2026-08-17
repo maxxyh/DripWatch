@@ -93,5 +93,6 @@ work, also verify against the real Supabase project and run security/performance
 - [Supabase sync architecture and operations](docs/supabase-sync.md)
 - [Engineering process and session learnings](docs/engineering-process.md)
 - [Web PWA setup, deployment, security, and offline behavior](docs/web-pwa.md)
+- [Testing the web PWA: environments and verification](docs/web-pwa-testing.md)
 - [Supabase schema and setup](supabase/README.md)
 - [Backup and restore runbook](supabase/backup/README.md)

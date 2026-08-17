@@ -26,47 +26,9 @@ rotating the session secret invalidates every session. Configure Vercel Firewall
 them — it never needs to match anyone else's, so each person can generate their own random
 32+ character string.
 
-### Where `SUPABASE_URL` / `SUPABASE_ANON_KEY` point
-
-Two options, either is a complete local setup:
-
-- **The shared hosted project.** Get the URL, anon key, and passcode from whoever manages the
-  project (password manager, not Supabase org membership — this app has no per-user Supabase
-  auth; see [Client bundle hygiene](#client-bundle-hygiene) below and `supabase/README.md`) and
-  drop them into `.env.local`. Simplest option, but local dev reads/writes the same database as
-  production and everyone else's preview deployments.
-- **A local Supabase stack**, fully isolated per person, running via the Supabase CLI + a Docker
-  runtime (Docker Desktop or the lighter [Colima](https://github.com/abiosoft/colima)):
-
-  ```bash
-  brew install supabase/tap/supabase colima docker   # one-time
-  colima start                                        # one-time per reboot; starts the Docker daemon
-  supabase start                                       # from the repo root, not web/
-  ```
-
-  `supabase start` applies `supabase/migrations/` and seeds `supabase/seed.sql` plus the sample
-  bean/brew photos declared under `[storage.buckets.*]` in `supabase/config.toml` (real images
-  from three beans in the shared notebook, kept small and photo-path-canonical — see the
-  comments in `seed.sql` if you need to add more). It prints `SUPABASE_URL` (as `API_URL`) and
-  `SUPABASE_ANON_KEY` (as `ANON_KEY`, the JWT one, not `PUBLISHABLE_KEY`) — copy those into
-  `web/.env.local` along with any `DRIPWATCH_PASSCODE`/`DRIPWATCH_SESSION_SECRET` you like, since
-  nothing here is a real secret. Supabase Studio is at the printed `STUDIO_URL` (typically
-  `http://127.0.0.1:54323`) if you want to browse the local data directly.
-
-  To reset to a clean seeded state at any point: `supabase db reset` (from the repo root). To
-  stop the stack: `supabase stop`.
-
-  After editing `supabase/schemas/dripwatch.sql`, regenerate the migration rather than hand
-  editing `supabase/migrations/`:
-
-  ```bash
-  supabase db diff -f <descriptive_name>
-  ```
-
-  Check the generated file before trusting it — the diff tool doesn't pick up changes to the
-  `storage.buckets` insert or the `storage.objects` policies at the bottom of
-  `schemas/dripwatch.sql` (DML and policies on a platform-managed table, outside what it diffs),
-  so that block currently has to be kept in sync by hand in the migration.
+For which `SUPABASE_URL`/`SUPABASE_ANON_KEY` to use (the shared hosted project vs. a fully
+isolated local Supabase stack) and how to verify a change, see
+[Testing the web PWA](web-pwa-testing.md).
 
 ## Vercel and offline behavior
 
@@ -131,22 +93,6 @@ The web can display only photos represented by a Supabase `bean_photos.remote_pa
 native-only `Bean.bagPhoto` value was never part of the Postgres contract; if such a bag has not
 completed the iOS migration/upload, the PWA correctly shows a placeholder until the native client
 syncs a `BeanPhoto` row and object.
-
-## Verification
-
-```bash
-cd web
-npm run typecheck
-npm run lint
-npm test
-npm run build
-npx playwright install chromium webkit
-npm run test:e2e
-```
-
-With disposable test data and real environment values, also verify two-session stale conflicts, bean and photo CRUD,
-pourover and espresso capture, plan consumption, soft deletion, offline fallback, reconnect
-refresh, and logout cache clearing.
 
 ## Client bundle hygiene
 
