@@ -83,13 +83,21 @@ export function photoUrl(
     : null;
 }
 function readCachedSnapshot(): Notebook | null {
-  const cached = localStorage.getItem(SNAPSHOT);
-  if (!cached) return null;
-  const lease = JSON.parse(localStorage.getItem(SESSION_LEASE) || "null") as {
-    expiresAt?: number;
-  } | null;
-  if (!lease?.expiresAt || lease.expiresAt <= Date.now()) return null;
-  return JSON.parse(cached) as Notebook;
+  try {
+    const cached = localStorage.getItem(SNAPSHOT);
+    if (!cached) return null;
+    const lease = JSON.parse(
+      localStorage.getItem(SESSION_LEASE) || "null",
+    ) as { expiresAt?: number } | null;
+    if (!lease?.expiresAt || lease.expiresAt <= Date.now()) return null;
+    return JSON.parse(cached) as Notebook;
+  } catch {
+    // Corrupted or incompatible cache entry: never let it block the real
+    // fetch, and clear it so it doesn't keep failing on every call.
+    localStorage.removeItem(SNAPSHOT);
+    localStorage.removeItem(SESSION_LEASE);
+    return null;
+  }
 }
 function useNotebook() {
   const [data, setData] = useState<Notebook | null>(null),

@@ -72,3 +72,33 @@ test("a repeat visit paints the cached notebook before the network refresh resol
   await expect(page.getByRole("link", { name: "Add bean" })).toBeVisible();
   await expect(page.getByText("Offline snapshot")).toHaveCount(0);
 });
+
+test("a corrupted cached snapshot doesn't strand the app on the loading skeleton", async ({
+  page,
+  context,
+}) => {
+  await context.addCookies([
+    { name: "dripwatch_session", value: "test", domain: "127.0.0.1", path: "/" },
+  ]);
+  await context.addInitScript(
+    ([snapshotKey, leaseKey, lease]) => {
+      // Simulates a truncated/interrupted localStorage write.
+      window.localStorage.setItem(snapshotKey as string, "{not valid json");
+      window.localStorage.setItem(leaseKey as string, lease as string);
+    },
+    [
+      "dripwatch-notebook-v1",
+      "dripwatch-session-lease",
+      JSON.stringify({ cacheScope: "test-scope", expiresAt: Date.now() + 3_600_000 }),
+    ] as const,
+  );
+  await page.route("**/api/notebook", (route) =>
+    route.fulfill({ json: notebook("Fresh Bean") }),
+  );
+
+  await page.goto("/");
+  // Must still reach real content via the network fetch, not hang forever
+  // on the skeleton because reading the corrupted cache threw before the
+  // fetch ever started.
+  await expect(page.getByText("Fresh Bean")).toBeVisible({ timeout: 3000 });
+});
