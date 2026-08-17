@@ -498,7 +498,7 @@ function EditorFrame({
   children: React.ReactNode;
 }) {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-5">
+    <main className="mx-auto max-w-2xl px-4 py-5 w-[calc(100%-var(--spacing)*10)]">
       <Button variant="ghost" onClick={() => history.back()}>
         <ArrowLeft data-icon="inline-start" />
         Back
