@@ -82,11 +82,33 @@ export function photoUrl(
     ? `/api/photos/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`
     : null;
 }
+function readCachedSnapshot(): Notebook | null {
+  const cached = localStorage.getItem(SNAPSHOT);
+  if (!cached) return null;
+  const lease = JSON.parse(localStorage.getItem(SESSION_LEASE) || "null") as {
+    expiresAt?: number;
+  } | null;
+  if (!lease?.expiresAt || lease.expiresAt <= Date.now()) return null;
+  return JSON.parse(cached) as Notebook;
+}
 function useNotebook() {
   const [data, setData] = useState<Notebook | null>(null),
     [offline, setOffline] = useState(false),
+    // True only for the brief window between painting a cached snapshot and
+    // the background refresh() confirming it: keeps mutations disabled
+    // without claiming we're offline when we're not.
+    [revalidating, setRevalidating] = useState(false),
     [error, setError] = useState("");
+  const paintedCache = useRef(false);
   async function refresh() {
+    if (!paintedCache.current) {
+      paintedCache.current = true;
+      const cached = readCachedSnapshot();
+      if (cached) {
+        setData(cached);
+        setRevalidating(true);
+      }
+    }
     try {
       const response = await fetch("/api/notebook", { cache: "no-store" });
       if (response.status === 401 || response.status === 403) {
@@ -105,14 +127,13 @@ function useNotebook() {
       setOffline(
         response.headers.get("x-dripwatch-offline-fallback") === "true",
       );
+      setRevalidating(false);
       localStorage.setItem(SNAPSHOT, JSON.stringify(next));
     } catch (e) {
-      const cached = localStorage.getItem(SNAPSHOT);
-      const lease = JSON.parse(
-        localStorage.getItem(SESSION_LEASE) || "null",
-      ) as { expiresAt?: number } | null;
-      if (cached && lease?.expiresAt && lease.expiresAt > Date.now()) {
-        setData(JSON.parse(cached));
+      const cached = readCachedSnapshot();
+      setRevalidating(false);
+      if (cached) {
+        setData(cached);
         setOffline(true);
       } else {
         localStorage.removeItem(SNAPSHOT);
@@ -124,7 +145,7 @@ function useNotebook() {
     const timeout = setTimeout(refresh, 0);
     return () => clearTimeout(timeout);
   }, []);
-  return { data, offline, error, refresh, setData };
+  return { data, offline, revalidating, error, refresh, setData };
 }
 export function NotebookApp({
   view = "shelf",
@@ -147,6 +168,10 @@ export function NotebookApp({
         </Alert>
       </main>
     );
+  // Read-only while genuinely offline, and also for the brief window where
+  // we've painted a cached snapshot but haven't heard back from the
+  // background refresh yet — without flashing the offline banner for it.
+  const readOnly = notebook.offline || notebook.revalidating;
   return (
     <div className="min-h-dvh pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <Header offline={notebook.offline} refresh={notebook.refresh} />
@@ -162,11 +187,11 @@ export function NotebookApp({
         <BeanDetail
           data={notebook.data!}
           beanId={id}
-          offline={notebook.offline}
+          offline={readOnly}
           refresh={notebook.refresh}
         />
       ) : (
-        <Shelf data={notebook.data!} offline={notebook.offline} />
+        <Shelf data={notebook.data!} offline={readOnly} />
       )}
     </div>
   );

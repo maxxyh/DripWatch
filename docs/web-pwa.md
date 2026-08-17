@@ -38,6 +38,17 @@ mode is persistently read-only. Reconnect reloads server state before editing. L
 local snapshot, expires the cookie, and purges protected caches. Cached data is not encrypted at
 rest; avoid installing on an untrusted shared device.
 
+On top of the service worker's network-first `/api/notebook` handling, the app layer
+(`useNotebook` in `src/components/notebook-app.tsx`) also paints the last `localStorage` snapshot
+immediately on mount — before the background `refresh()` fetch resolves — whenever it exists and
+its session lease hasn't expired, then swaps in the live response when it lands. This is a
+perceived-loading-speed optimization on top of the offline fallback, not a change to it: the
+network request always still fires, mutation entry points stay disabled (`revalidating`) until
+that fetch confirms freshness, and the "Offline snapshot" banner only appears if the fetch
+actually fails, never during a routine revalidation. `e2e/notebook-cache.spec.ts` covers this by
+mocking `/api/notebook` with an artificial delay and asserting the cached content renders well
+before it resolves.
+
 Core web mutations use client UUIDs and soft deletion. A bean has at most one active planned next
 brew across both methods; creating or updating one method's plan clears the other method slot.
 The plan appears once above the bean history, never as a card attached to an individual historical
