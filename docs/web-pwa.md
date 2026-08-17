@@ -43,6 +43,16 @@ database turns each one into a cross-region round trip — measured at ~1-9s per
 `iad1` (US East) against a Singapore project, dropping to well under a second once colocated. If
 the Supabase project ever moves region, update this value to match.
 
+The Vercel project's Git integration (Project Settings → Git) must have **Root Directory** set to
+`web`, not the repo root — the Next.js app lives in the `web/` subdirectory alongside the native
+Xcode project, and a build at the repo root finds no `package.json` and fails. Once connected,
+pushing a branch alone only gets you a pass/fail GitHub commit status (green "Vercel — Deployment
+has completed"), and its target link opens the Vercel inspector, which needs account access.
+**Open a PR** to get the actual preview URL: with "Pull Request Comments" enabled (the default),
+Vercel's bot comments the clickable preview URL directly on the PR, viewable by any collaborator
+with repo access — no Vercel account needed. The deployment itself is publicly reachable; access
+is still gated by DripWatch's own shared passcode, not Vercel account permissions.
+
 The standalone manifest derives its icons from the native app. The service worker uses cache-first
 for immutable assets and network-first fallback for the last notebook snapshot and viewed photos.
 Protected caches are isolated by a random signed-session scope and become unavailable when the
