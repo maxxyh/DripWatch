@@ -137,6 +137,12 @@ the sibling `build-manifest.json`, or, most directly, by diffing the actual `_ne
 requests captured for a cold load of the route before and after the change. This split measured
 ~19% (~42 KB gzipped) off the real JS fetched for a cold `/` load.
 
+When saving an analyzer snapshot for a before/after comparison (`cp -r .next/diagnostics/analyze
+<name>`), put it outside the repo (e.g. `/tmp`) rather than under `web/`: `.next/` is gitignored
+but an ad-hoc copy elsewhere isn't, so it silently becomes an untracked directory of static HTML
+that pollutes `npm run lint` and sits in the tree unreviewed. A leftover `web/before/` snapshot
+from verifying the split above had to be deleted for exactly this reason.
+
 ## Required future migration
 
 The shared passcode is a temporary interface gate while anonymous Supabase policies support iOS.
