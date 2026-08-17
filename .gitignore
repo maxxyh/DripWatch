@@ -58,3 +58,7 @@ Icon
 .artifacts/
 .shots/
 .icongen/
+
+# Supabase CLI — local-only runtime state (not schema/seed data, keep those committed)
+/supabase/.branches/
+/supabase/.temp/
