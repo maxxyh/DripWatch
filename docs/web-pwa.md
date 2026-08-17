@@ -91,7 +91,18 @@ negative entry. Observed drawdown and shot time use the native digit-entry conve
 becomes `2:30` while the stopwatch remains available.
 
 Photo uploads are also decoded at the server boundary and rejected unless they are valid JPEGs
-whose width and height are both at most 1400 pixels. Supabase database definitions in
+whose width and height are both at most 1400 pixels. On the read side, `/api/photos/[bucket]/...`
+resizes via `sharp` when called with a `?w=` (and optional `?q=`) query param, clamped to
+16-1400px / 40-90 quality; `src/lib/image-loader.ts` is the `next/image` custom loader that
+appends those params, so every display context requests roughly the size it renders at instead of
+always the full upload. Both `w`/`q` and the resulting `sharp()` decode share the same 1400px
+`limitInputPixels` cap as upload validation — necessary because the anonymous Supabase policies
+(see "Required future migration" below) let `anon` write `storage.objects` and the referencing
+`bean_photos`/`brews` rows directly, bypassing the upload endpoint's own size/dimension checks, so
+the read path cannot assume every stored object was validated. Because the proxy path embeds a
+sha256 content hash, a given `(hash, width, quality)` tuple's output never changes; the route
+returns `Cache-Control: private, max-age=31536000, immutable` and checks `If-None-Match` before
+touching Storage or sharp, rather than the `no-cache` used previously. Supabase database definitions in
 `src/lib/database.types.ts` are generated from the hosted project; run `npm run types:generate`
 after schema changes. The script writes through a temporary file so an authentication or network
 failure cannot truncate the committed definitions.

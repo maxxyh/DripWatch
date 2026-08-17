@@ -397,7 +397,6 @@ function BeanCard({
               sizes="(max-width:640px) 45vw, 25vw"
               className="object-cover"
               loading={priority ? "eager" : "lazy"}
-              unoptimized
             />
           ) : (
             <div className="grid h-full place-items-center">

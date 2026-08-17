@@ -686,8 +686,8 @@ export function BrewEditor({
                       src={`/api/photos/brew-photos/${existing.photo_path}`}
                       alt="Saved brew"
                       fill
+                      sizes="(max-width:672px) 100vw, 640px"
                       className="object-cover"
-                      unoptimized
                     />
                   </div>
                 )}

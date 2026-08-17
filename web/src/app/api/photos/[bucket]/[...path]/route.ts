@@ -1,13 +1,32 @@
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
+import sharp from "sharp";
 import { isSameOrigin, requireSession } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { validateNormalizedJpeg } from "@/lib/photo-validation";
+import { validateNormalizedJpeg, MAX_PHOTO_DIMENSION } from "@/lib/photo-validation";
 const allowed = new Set(["bean-photos", "brew-photos"]);
 const canonicalPath =
   /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{64})\.jpg$/;
+const MIN_RESIZE_WIDTH = 16;
+const DEFAULT_QUALITY = 75;
+const MIN_QUALITY = 40;
+const MAX_QUALITY = 90;
+function parseVariant(url: URL) {
+  const rawWidth = url.searchParams.get("w");
+  const parsedWidth = rawWidth === null ? NaN : Number.parseInt(rawWidth, 10);
+  const width = Number.isFinite(parsedWidth)
+    ? Math.min(Math.max(parsedWidth, MIN_RESIZE_WIDTH), MAX_PHOTO_DIMENSION)
+    : null;
+  const rawQuality = url.searchParams.get("q");
+  const parsedQuality =
+    rawQuality === null ? NaN : Number.parseInt(rawQuality, 10);
+  const quality = Number.isFinite(parsedQuality)
+    ? Math.min(Math.max(parsedQuality, MIN_QUALITY), MAX_QUALITY)
+    : DEFAULT_QUALITY;
+  return { width, quality };
+}
 export async function GET(
-  _: Request,
+  request: Request,
   { params }: { params: Promise<{ bucket: string; path: string[] }> },
 ) {
   try {
@@ -51,18 +70,35 @@ export async function GET(
     }
     if (deletedAt || referencedPath !== relativePath)
       return new NextResponse(null, { status: 404 });
+    const { width, quality } = parseVariant(new URL(request.url));
+    const etag = width ? `"${match[2]}-w${width}-q${quality}"` : `"${match[2]}"`;
+    const cacheHeaders = {
+      "Cache-Control": "private, max-age=31536000, immutable",
+      ETag: etag,
+      "X-Content-Type-Options": "nosniff",
+      "Cross-Origin-Resource-Policy": "same-origin",
+    };
+    if (request.headers.get("if-none-match") === etag)
+      return new NextResponse(null, { status: 304, headers: cacheHeaders });
     const { data, error } = await supabase()
       .storage.from(bucket)
       .download(relativePath);
     if (error) throw error;
-    return new NextResponse(await data.arrayBuffer(), {
+    const original = await data.arrayBuffer();
+    const body = width
+      ? await sharp(Buffer.from(original), {
+          failOn: "error",
+          limitInputPixels: MAX_PHOTO_DIMENSION * MAX_PHOTO_DIMENSION,
+        })
+          .resize({ width, withoutEnlargement: true })
+          .jpeg({ quality })
+          .toBuffer()
+      : original;
+    return new NextResponse(body, {
       headers: {
         "Content-Type": "image/jpeg",
         "Content-Disposition": "inline",
-        "Cache-Control": "private, no-cache",
-        ETag: `"${match[2]}"`,
-        "X-Content-Type-Options": "nosniff",
-        "Cross-Origin-Resource-Policy": "same-origin",
+        ...cacheHeaders,
       },
     });
   } catch (error) {

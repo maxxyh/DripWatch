@@ -324,7 +324,6 @@ function CharacterCard({
             fill
             sizes="(max-width:1024px) 100vw, 55vw"
             className="object-cover"
-            unoptimized
           />
         ) : (
           <div className="grid h-full place-items-center">
@@ -363,7 +362,6 @@ function CharacterCard({
                       fill
                       sizes="10rem"
                       className="object-cover"
-                      unoptimized
                     />
                   )}
                 </div>
@@ -765,7 +763,6 @@ function HistoryCard({
               fill
               sizes="(max-width:1024px) 100vw, 40vw"
               className="object-cover"
-              unoptimized
             />
           </div>
         )}

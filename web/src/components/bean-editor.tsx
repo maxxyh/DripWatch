@@ -310,8 +310,8 @@ export function BeanEditor({ id }: { id?: string }) {
                                 src={photo.preview}
                                 alt={`Bag photo ${index + 1}`}
                                 fill
+                                sizes="(max-width:640px) 45vw, 210px"
                                 className="object-cover"
-                                unoptimized
                               />
                             )}
                           </div>
