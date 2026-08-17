@@ -117,6 +117,26 @@ and confirm the client chunks contain no `zod` bytes with `grep -rl zod .next/st
 `next/image`, `next/font`, and named `lucide-react` imports (auto-optimized by Next) are already
 used correctly; keep doing so in new code.
 
+A second pattern in the same vein: `BeanDetail` and everything exclusively reachable from it
+(`CharacterCard`, `PlanCard`, `RecipeReadout`, `HistoryCard`, and transitively `RecipeEditor` with
+its `@base-ui/react` `Select`/`ToggleGroup`, plus the `AlertDialog` family) previously lived inside
+`src/components/notebook-app.tsx` alongside `Shelf`/`BeanCard`, which both `/` and `/beans/[id]`
+import. Next's route-based splitting cannot separate two components sharing one static module
+graph, so `/` shipped BeanDetail's dialog/editor code even though only `/beans/[id]` renders it.
+It now lives in `src/components/bean-detail.tsx` (default export) and is loaded from
+`notebook-app.tsx` via `next/dynamic()`, so it code-splits into its own chunk fetched only when a
+bean detail page actually mounts. `photoUrl()`, needed by both files, moved to `src/lib/domain.ts`.
+
+Caveat when verifying this kind of split: the bundle analyzer's per-route "All Route Modules"
+total (and its module count) sums every module reachable from the route through both sync and
+async edges — it does not exclude `next/dynamic()`-split code, so it will not shrink, and may even
+tick up slightly from loadable-wrapper bookkeeping, even when the split is working correctly.
+Judge it instead by confirming the split chunk's files (listed in
+`.next/server/app/<route>/react-loadable-manifest.json`) share zero files with `rootMainFiles` in
+the sibling `build-manifest.json`, or, most directly, by diffing the actual `_next/static/chunks/*`
+requests captured for a cold load of the route before and after the change. This split measured
+~19% (~42 KB gzipped) off the real JS fetched for a cold `/` load.
+
 ## Required future migration
 
 The shared passcode is a temporary interface gate while anonymous Supabase policies support iOS.

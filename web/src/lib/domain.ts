@@ -11,6 +11,14 @@ export type {
   Notebook,
 } from "./domain-schema";
 
+export function photoUrl(
+  bucket: "bean-photos" | "brew-photos",
+  path: string | null,
+) {
+  return path
+    ? `/api/photos/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`
+    : null;
+}
 export const emptyRecipe = (): Recipe => ({ pours: [] });
 export const newPourover = (): Recipe => ({
   pours: [],
