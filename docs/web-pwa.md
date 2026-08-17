@@ -91,6 +91,21 @@ With disposable test data and real environment values, also verify two-session s
 pourover and espresso capture, plan consumption, soft deletion, offline fallback, reconnect
 refresh, and logout cache clearing.
 
+## Client bundle hygiene
+
+`src/lib/domain-schema.ts` holds the Zod schemas used to validate rows in `src/lib/notebook.ts`
+(server-only, reached only from `src/app/api/notebook/route.ts`). `src/lib/domain.ts` holds the
+plain formatting/calculation helpers and re-exported types that client components use. Keep this
+split: importing `zod` from a module that any `"use client"` component also imports pulls the
+whole validation runtime into the shared client bundle even when the client only touches the pure
+helpers, since a mutually-recursive schema definition is not something bundlers can safely
+tree-shake out of an otherwise-used file. This previously added ~300 KB (minified) to the app's
+largest client chunk. Verify with `npx next experimental-analyze --output` (writes to
+`.next/diagnostics/analyze`, or omit `--output` for the interactive view) after `npm run build`,
+and confirm the client chunks contain no `zod` bytes with `grep -rl zod .next/static/chunks`.
+`next/image`, `next/font`, and named `lucide-react` imports (auto-optimized by Next) are already
+used correctly; keep doing so in new code.
+
 ## Required future migration
 
 The shared passcode is a temporary interface gate while anonymous Supabase policies support iOS.

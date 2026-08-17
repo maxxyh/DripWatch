@@ -4,20 +4,18 @@ import {
   brewDiff,
   effectiveWater,
   grindDisplay,
-  grinderMutationSchema,
   newPourover,
   normalizeTerm,
   normalizeTerms,
-  recipeSchema,
   reconcileWater,
   liveTimeEntry,
   secondsFromDigits,
   singlePendingPlanPatch,
   setTotalWater,
   suggestedTargets,
-  tasteSchema,
   type Recipe,
 } from "./domain";
+import { grinderMutationSchema, recipeSchema, tasteSchema } from "./domain-schema";
 describe("Swift recipe parity", () => {
   it("starts a pourover with native defaults", () =>
     expect(newPourover()).toMatchObject({
