@@ -8,7 +8,7 @@ import {
   recipeSchema,
   tasteSchema,
   type Notebook,
-} from "./domain";
+} from "./domain-schema";
 import { supabase } from "./supabase";
 type PageQuery = {
   order(column: string, options?: { ascending?: boolean }): PageQuery;
