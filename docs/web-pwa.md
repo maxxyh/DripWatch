@@ -36,6 +36,13 @@ Create a separate Vercel project rooted at `web/`, select Node 22+, and configur
 variables. `web/vercel.json` pins the Next.js framework preset so a project first created through
 the CLI does not inherit the static “Other” output behavior. No database schema change is required.
 
+`web/vercel.json` also pins `regions` to the Supabase project's region (`sin1`, matching
+`ap-southeast-1`). Every request to `/api/notebook` and `/api/photos/...` makes at least one
+Postgres round trip plus, for photos, a Storage download, so running the function far from the
+database turns each one into a cross-region round trip — measured at ~1-9s per request on
+`iad1` (US East) against a Singapore project, dropping to well under a second once colocated. If
+the Supabase project ever moves region, update this value to match.
+
 The standalone manifest derives its icons from the native app. The service worker uses cache-first
 for immutable assets and network-first fallback for the last notebook snapshot and viewed photos.
 Protected caches are isolated by a random signed-session scope and become unavailable when the
