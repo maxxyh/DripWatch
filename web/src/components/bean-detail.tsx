@@ -426,18 +426,6 @@ function CharacterCard({
             ))}
           </div>
         )}
-        {bean.my_flavor_tags.length > 0 && (
-          <div>
-            <p className="mb-2 text-xs text-muted-foreground">Your tags</p>
-            <div className="flex flex-wrap gap-2">
-              {bean.my_flavor_tags.map((tag) => (
-                <Badge key={tag} variant="secondary">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
       </CardContent>
       <PhotoViewer
         photo={preview}

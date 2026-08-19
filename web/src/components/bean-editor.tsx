@@ -24,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PhotoViewer, type PreviewPhoto } from "@/components/photo-viewer";
-import { TermField } from "@/components/term-field";
 import { fetchNotebook, mutate, normalizePhoto } from "@/lib/client-mutations";
 import {
   normalizeTerm,
@@ -51,7 +50,6 @@ type PhotoDraft =
 export function BeanEditor({ id }: { id?: string }) {
   const router = useRouter();
   const [form, setForm] = useState<Form>(blank),
-    [flavorTags, setFlavorTags] = useState<string[]>([]),
     [preview, setPreview] = useState<PreviewPhoto | null>(null),
     [row, setRow] = useState<BeanRow | null>(null),
     [photos, setPhotos] = useState<PhotoDraft[]>([]),
@@ -102,7 +100,6 @@ export function BeanEditor({ id }: { id?: string }) {
           roast_date: b.roast_date?.slice(0, 10) ?? "",
           roaster_notes: b.roaster_notes ?? "",
         });
-        setFlavorTags(b.my_flavor_tags);
         })
         .catch(() =>
           setLoadError(
@@ -115,10 +112,6 @@ export function BeanEditor({ id }: { id?: string }) {
   }, [id]);
   const change = (key: keyof Form, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
-  const addFlavorTag = (term: string) =>
-    setFlavorTags((tags) => normalizeTerms([...tags, term]));
-  const removeFlavorTag = (term: string) =>
-    setFlavorTags((tags) => tags.filter((tag) => tag !== term));
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() && !photos.length) {
@@ -149,7 +142,7 @@ export function BeanEditor({ id }: { id?: string }) {
             : null,
           roaster_notes:
             normalizeTerms(form.roaster_notes.split(",")).join(", ") || null,
-          my_flavor_tags: flavorTags,
+          my_flavor_tags: row?.my_flavor_tags ?? [],
           finished_at: row?.finished_at ?? null,
           pending_next_pourover: row?.pending_next_pourover ?? null,
           pending_next_espresso: row?.pending_next_espresso ?? null,
@@ -492,13 +485,6 @@ export function BeanEditor({ id }: { id?: string }) {
                     Separate printed notes with commas to create chips.
                   </FieldDescription>
                 </Field>
-                <TermField
-                  label="My flavor tags"
-                  values={flavorTags}
-                  placeholder="honey"
-                  onAdd={addFlavorTag}
-                  onRemove={removeFlavorTag}
-                />
               </FieldGroup>
             </CardContent>
           </Card>
