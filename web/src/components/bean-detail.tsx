@@ -11,7 +11,6 @@ import {
   Copy,
   Ellipsis,
   ImageIcon,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -53,7 +52,11 @@ import {
 } from "@/lib/domain";
 import { mutate } from "@/lib/client-mutations";
 import { RecipeEditor } from "@/components/recipe-editor";
-import { ChangeChips, RecipeReadout } from "@/components/recipe-readout";
+import {
+  ChangeChips,
+  RecipeReadout,
+  RoasterNoteChips,
+} from "@/components/recipe-readout";
 import { PhotoViewer, type PreviewPhoto } from "@/components/photo-viewer";
 
 export default function BeanDetail({
@@ -72,7 +75,7 @@ export default function BeanDetail({
   const bean = data.beans.find((b) => b.id === beanId && !b.deleted_at);
   if (!bean)
     return (
-      <main className="mx-auto max-w-3xl px-4 py-16">
+      <main className="mx-auto w-full max-w-3xl px-4 py-16">
         <Empty>
           <EmptyHeader>
             <EmptyTitle>Bean not found</EmptyTitle>
@@ -151,7 +154,7 @@ export default function BeanDetail({
     }
   }
   return (
-    <main className="mx-auto max-w-6xl px-4 py-5 md:px-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-5 md:px-8">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <Link href="/" className={buttonVariants({ variant: "ghost" })}>
           <ArrowLeft data-icon="inline-start" />
@@ -416,16 +419,7 @@ function CharacterCard({
               </div>
             ))}
         </dl>
-        {bean.roaster_notes && (
-          <div className="flex flex-wrap gap-2">
-            {bean.roaster_notes.split(",").map((n) => (
-              <Badge key={n} variant="outline">
-                <Sparkles />
-                {n.trim()}
-              </Badge>
-            ))}
-          </div>
-        )}
+        {bean.roaster_notes && <RoasterNoteChips notes={bean.roaster_notes} />}
       </CardContent>
       <PhotoViewer
         photo={preview}
@@ -517,73 +511,79 @@ function PlanCard({
     }
   }
   return (
-    <Card className="border-primary/40 bg-primary/5 [border-style:dashed]">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base text-primary">
-            Plan for next {method}
-          </CardTitle>
-          <div className="flex gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={offline || working}
-              onClick={() => {
-                setDraft(recipe);
-                setEditing((value) => !value);
-              }}
-            >
-              {editing ? "Close" : "Edit plan"}
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              disabled={offline || working}
-              aria-label={`Discard ${method} plan`}
-              onClick={() => persist(null)}
-            >
-              <X />
-            </Button>
-          </div>
-        </div>
-        {changes.length > 0 && (
-          <CardDescription>
-            <ChangeChips changes={changes} />
-          </CardDescription>
-        )}
-      </CardHeader>
-      <CardContent>
-        {editing ? (
-          <div className="flex flex-col gap-3">
-            <RecipeEditor
-              recipe={draft}
-              onChange={setDraft}
-              method={method}
-              grinders={data.grinders.filter((grinder) => !grinder.deleted_at)}
-            />
-            <div className="flex gap-2">
+    <div className="flex flex-col gap-3">
+      <Card className="border-primary/40 bg-primary/5 [border-style:dashed]">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-base text-primary">
+              Plan for next {method}
+            </CardTitle>
+            <div className="flex gap-1">
               <Button
-                className="flex-1"
-                disabled={working}
-                onClick={() => persist(draft)}
+                size="sm"
+                variant="ghost"
+                disabled={offline || working}
+                onClick={() => {
+                  setDraft(recipe);
+                  setEditing((value) => !value);
+                }}
               >
-                Save plan
+                {editing ? "Close" : "Edit plan"}
               </Button>
               <Button
-                variant="outline"
-                className="flex-1"
-                disabled={working || offline}
-                onClick={brewDraftNow}
+                size="icon"
+                variant="ghost"
+                disabled={offline || working}
+                aria-label={`Discard ${method} plan`}
+                onClick={() => persist(null)}
               >
-                Brew this now
+                <X />
               </Button>
             </div>
           </div>
-        ) : (
-          <RecipeReadout recipe={recipe} />
+          {changes.length > 0 && (
+            <CardDescription>
+              <ChangeChips changes={changes} />
+            </CardDescription>
+          )}
+        </CardHeader>
+        {!editing && (
+          <CardContent>
+            <RecipeReadout recipe={recipe} />
+          </CardContent>
         )}
-      </CardContent>
-    </Card>
+      </Card>
+      {/* Deliberately outside the Card above: RecipeEditor renders its own "Recipe" card, so
+          nesting it inside CardContent here would double the horizontal padding around every
+          field (see the identical fix in brew-editor.tsx's "Plan the next brew" section). */}
+      {editing && (
+        <div className="flex flex-col gap-3">
+          <RecipeEditor
+            recipe={draft}
+            onChange={setDraft}
+            method={method}
+            grinders={data.grinders.filter((grinder) => !grinder.deleted_at)}
+          />
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              disabled={working}
+              onClick={() => persist(draft)}
+            >
+              Save plan
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={working || offline}
+              onClick={brewDraftNow}
+            >
+              Brew this now
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 function HistoryCard({

@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pause, Play } from "lucide-react";
+import { ArrowLeft, CornerDownRight, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,27 +20,32 @@ import {
   FieldLegend,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { RecipeEditor } from "./recipe-editor";
-import { RecipeChips } from "./recipe-readout";
+import {
+  BrewStatGrid,
+  ChangeChips,
+  PourPlanList,
+  RoasterNoteChips,
+} from "./recipe-readout";
 import { NumericStepper } from "./numeric-stepper";
 import { PhotoViewer, type PreviewPhoto } from "./photo-viewer";
 import { TermField } from "./term-field";
 import { TimeInput } from "./time-input";
+import { cn } from "@/lib/utils";
 import { fetchNotebook, mutate, normalizePhoto } from "@/lib/client-mutations";
 import {
   asPlanSeed,
+  brewDiff,
   emptyRecipe,
   emptyTaste,
-  gramText,
   newPourover,
   normalizeTerms,
   photoUrl,
   singlePendingPlanPatch,
-  suggestedTargets,
-  timeText,
   type BeanRow,
   type BrewRow,
   type Notebook,
@@ -244,7 +249,7 @@ export function BrewEditor({
   }, [running, elapsed]);
   if (loadError)
     return (
-      <main className="mx-auto max-w-2xl px-4 py-20">
+      <main className="mx-auto w-full max-w-2xl px-4 py-20">
         <h1 className="text-2xl font-semibold">Brew editor unavailable</h1>
         <p className="mt-2 text-muted-foreground">{loadError}</p>
         <Button className="mt-5" variant="outline" onClick={() => router.back()}>
@@ -253,14 +258,8 @@ export function BrewEditor({
       </main>
     );
   if (!book || !bean)
-    return <main className="mx-auto max-w-2xl px-4 py-20">Loading brew…</main>;
+    return <main className="mx-auto w-full max-w-2xl px-4 py-20">Loading brew…</main>;
   const activeBean = bean;
-  const savedPourTargets = recipe.pours.map((pour) => pour.toGrams);
-  const pourTargets =
-    savedPourTargets.length > 0 &&
-    savedPourTargets.every((target) => target !== undefined)
-      ? (savedPourTargets as number[])
-      : suggestedTargets(recipe, recipe.pourCount ?? 0);
   const previousTastes = book.brews
     .filter(
       (candidate) =>
@@ -275,8 +274,7 @@ export function BrewEditor({
           Object.keys(candidate.taste.balance).length),
     )
     .sort((a, b) => b.brewed_at.localeCompare(a.brewed_at))
-    .slice(0, 3)
-    .map((candidate) => candidate.taste);
+    .slice(0, 3);
   const canPlanNext = !book.brews.some(
     (candidate) =>
       !candidate.deleted_at &&
@@ -479,7 +477,7 @@ export function BrewEditor({
     }
   }
   return (
-    <main className="mx-auto max-w-2xl px-4 py-5">
+    <main className="mx-auto w-full max-w-2xl px-4 py-5">
       <Button variant="ghost" onClick={() => router.back()}>
         <ArrowLeft data-icon="inline-start" />
         Back
@@ -547,43 +545,18 @@ export function BrewEditor({
                   : ""}
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <RecipeChips recipe={recipe} />
-              {method === "pourover" && (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {pourTargets.map(
-                    (target, index) => {
-                      const pour = recipe.pours[index];
-                      return (
-                        <div
-                          key={pour?.id ?? index}
-                          className="rounded-lg border p-3"
-                        >
-                          <strong className="font-mono">
-                            #{index + 1} → {gramText(target)}g
-                          </strong>
-                          {(pour?.startSec !== undefined || pour?.style) && (
-                            <p className="text-xs text-muted-foreground">
-                              {pour.startSec !== undefined
-                                ? `${timeText(pour.startSec)}${
-                                    pour.endSec !== undefined
-                                      ? `–${timeText(pour.endSec)}`
-                                      : ""
-                                  }`
-                                : ""}
-                              {pour.style ? ` · ${pour.style}` : ""}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    },
-                  )}
-                </div>
+            <CardContent className="flex flex-col gap-4">
+              <BrewStatGrid recipe={recipe} method={method} />
+              {method === "pourover" && recipe.pours.length > 0 && (
+                <PourPlanList recipe={recipe} />
               )}
               {activeBean.roaster_notes && (
-                <p className="text-sm text-muted-foreground">
-                  Roaster notes: {activeBean.roaster_notes}
-                </p>
+                <div className="flex flex-col gap-1.5 border-t pt-3">
+                  <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                    Roaster notes
+                  </span>
+                  <RoasterNoteChips notes={activeBean.roaster_notes} />
+                </div>
               )}
             </CardContent>
           </Card>
@@ -746,40 +719,66 @@ export function BrewEditor({
             </CardContent>
           </Card>
           {canPlanNext && (
-            <Card className="border-primary/40 bg-primary/5 [border-style:dashed]">
-              <CardHeader>
-                <CardTitle>Plan the next {method}</CardTitle>
-                <CardDescription>
+            // Deliberately not wrapped in a Card: RecipeEditor renders its own "Recipe" card, so
+            // an outer card here would double the horizontal padding around every field (a
+            // dashed card's CardContent padding, plus RecipeEditor's own Card's padding again) —
+            // exactly what made this section feel squeezed next to the rest of the flow. iOS's
+            // RecipeEditor.swift has no card of its own for the same reason: whichever card wraps
+            // it is the only one.
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2 text-primary">
+                  <CornerDownRight className="size-4" aria-hidden />
+                  <h2 className="font-heading text-base font-medium">
+                    Plan the next {method}
+                  </h2>
+                </div>
+                <p className="text-sm text-muted-foreground">
                   Measured shot time and drawdown are never carried forward
                   automatically.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ToggleGroup
-                  value={plan ? ["plan"] : []}
-                  onValueChange={(v) => {
-                    const on = v.includes("plan");
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <FieldLabel htmlFor="plan-next-brew" className="text-sm font-normal">
+                  Plan a change for next time
+                </FieldLabel>
+                <Switch
+                  id="plan-next-brew"
+                  checked={plan}
+                  onCheckedChange={(on) => {
                     setPlan(on);
                     if (on && !planSeeded) {
                       setNext(asPlanSeed(recipe));
                       setPlanSeeded(true);
                     }
                   }}
-                >
-                  <ToggleGroupItem value="plan">Plan next brew</ToggleGroupItem>
-                </ToggleGroup>
-                {plan && (
-                  <div className="mt-4">
-                    <RecipeEditor
-                      recipe={next}
-                      onChange={setNext}
-                      method={method}
-                      grinders={book.grinders.filter((g) => !g.deleted_at)}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                />
+              </div>
+              {plan && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Pre-filled with what you just brewed — change only what
+                    you want.
+                  </p>
+                  {(() => {
+                    const planChanges = brewDiff(recipe, next);
+                    return planChanges.length > 0 ? (
+                      <ChangeChips changes={planChanges} />
+                    ) : (
+                      <p className="text-xs text-muted-foreground/70">
+                        No changes yet — tweak a value below.
+                      </p>
+                    );
+                  })()}
+                  <RecipeEditor
+                    recipe={next}
+                    onChange={setNext}
+                    method={method}
+                    grinders={book.grinders.filter((g) => !g.deleted_at)}
+                  />
+                </>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -816,6 +815,85 @@ export function BrewEditor({
     </main>
   );
 }
+/// The last few brews' tasting notes for this bean/method, grouped by date rather than pooled
+/// into one flat list — each date keeps its own positive/negative coloring (mirrors the native
+/// app's `PreviousNotesView`). Collapsed to the most recent date by default; terms are tappable
+/// to reuse in the current taste with one tap.
+function PreviousTastingNotes({
+  brews,
+  onAdd,
+}: {
+  brews: BrewRow[];
+  onAdd: (value: string, positive: boolean) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  if (!brews.length) return null;
+  const visible = expanded ? brews : brews.slice(0, 1);
+  return (
+    <Field>
+      <div className="flex items-baseline justify-between gap-2">
+        <FieldLabel>Previous notes</FieldLabel>
+        <span className="text-xs text-muted-foreground">tap a term to reuse</span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {visible.map((brew, index) => (
+          <div
+            key={brew.id}
+            className={cn("flex flex-col gap-1.5", index > 0 && "border-t pt-3")}
+          >
+            <span className="text-xs font-semibold text-muted-foreground">
+              {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+                new Date(brew.brewed_at),
+              )}
+            </span>
+            {(brew.taste.positives.length > 0 || brew.taste.negatives.length > 0) && (
+              <div className="flex flex-wrap gap-1.5">
+                {brew.taste.positives.map((term) => (
+                  <Button
+                    key={`+${term}`}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-positive"
+                    onClick={() => onAdd(term, true)}
+                  >
+                    + {term}
+                  </Button>
+                ))}
+                {brew.taste.negatives.map((term) => (
+                  <Button
+                    key={`-${term}`}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-negative"
+                    onClick={() => onAdd(term, false)}
+                  >
+                    − {term}
+                  </Button>
+                ))}
+              </div>
+            )}
+            {brew.taste.note && (
+              <p className="text-xs text-muted-foreground italic">“{brew.taste.note}”</p>
+            )}
+          </div>
+        ))}
+      </div>
+      {brews.length > 1 && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="self-start text-primary"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Show less" : `Show ${brews.length - 1} more`}
+        </Button>
+      )}
+    </Field>
+  );
+}
 function TasteEditor({
   taste,
   setTaste,
@@ -825,7 +903,7 @@ function TasteEditor({
   taste: Taste;
   setTaste: (t: Taste) => void;
   addTerm: (v: string, p: boolean) => void;
-  previous: Taste[];
+  previous: BrewRow[];
 }) {
   return (
     <Card>
@@ -899,51 +977,7 @@ function TasteEditor({
               )}
             </div>
           </FieldSet>
-          {previous.length > 0 && (
-            <Field>
-              <FieldLabel>Add from previous tastings</FieldLabel>
-              <div className="flex flex-wrap gap-2">
-                {previous.flatMap((candidate, index) => [
-                  ...candidate.positives.map((term) => (
-                    <Button
-                      key={`${index}-positive-${term}`}
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        setTaste({
-                          ...taste,
-                          positives: normalizeTerms([
-                            ...taste.positives,
-                            term,
-                          ]),
-                        })
-                      }
-                    >
-                      + {term}
-                    </Button>
-                  )),
-                  ...candidate.negatives.map((term) => (
-                    <Button
-                      key={`${index}-negative-${term}`}
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        setTaste({
-                          ...taste,
-                          negatives: normalizeTerms([
-                            ...taste.negatives,
-                            term,
-                          ]),
-                        })
-                      }
-                    >
-                      − {term}
-                    </Button>
-                  )),
-                ])}
-              </div>
-            </Field>
-          )}
+          <PreviousTastingNotes brews={previous} onAdd={addTerm} />
           <Field>
             <FieldLabel>Rating</FieldLabel>
             <ToggleGroup
