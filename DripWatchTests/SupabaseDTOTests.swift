@@ -158,6 +158,31 @@ struct SupabaseDTOTests {
         }
     }
 
+    @Test func clearedOptionalFieldsEncodeAsExplicitNullNotOmittedKeys() throws {
+        // Swift's synthesized Encodable calls `encodeIfPresent` for Optional properties, which
+        // OMITS the key when nil. PostgREST's upsert only overwrites columns present in the JSON
+        // body, so an omitted key leaves the old server value in place — the bug behind a
+        // discarded "next brew" plan (or a reopened finished bean) reappearing after sync.
+        // BeanDTO/BrewDTO override `encode(to:)` to always emit the key so nil clears the column.
+        let encoder = SupabaseCoding.encoder()
+
+        let bean = Bean(name: "Voyager")
+        bean.pendingNextPourover = nil
+        bean.pendingNextEspresso = nil
+        bean.finishedAt = nil
+        let beanObject = try JSONSerialization.jsonObject(with: encoder.encode(BeanDTO(bean))) as! [String: Any]
+        for key in ["pending_next_pourover", "pending_next_espresso", "finished_at"] {
+            #expect(beanObject.keys.contains(key), "\(key) must be present so PostgREST clears it")
+            #expect(beanObject[key] is NSNull)
+        }
+
+        let brew = Brew()
+        brew.nextRecipeDraft = nil
+        let brewObject = try JSONSerialization.jsonObject(with: encoder.encode(BrewDTO(brew))) as! [String: Any]
+        #expect(brewObject.keys.contains("next_recipe_draft"))
+        #expect(brewObject["next_recipe_draft"] is NSNull)
+    }
+
     @Test func postgrestTimestampFormatsDecodeAndEncodeAsUTC() throws {
         for (value, fraction) in [
             ("2024-01-02T03:04:56Z", 0.0),

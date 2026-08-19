@@ -90,6 +90,34 @@ struct BeanDTO: SupabaseRow {
         bean.pendingNextPourover = pendingNextPourover
         bean.pendingNextEspresso = pendingNextEspresso
     }
+
+    // Swift's synthesized Encodable uses `encodeIfPresent` for Optional properties, which OMITS
+    // the key entirely when the value is nil. PostgREST's upsert only overwrites columns present
+    // in the JSON body, so a field cleared back to nil (e.g. discarding a next-brew plan, or
+    // reopening a finished bean) would silently fail to clear server-side and reappear on the
+    // next pull. Encoding every field explicitly forces nil Optionals to serialize as JSON
+    // `null`, which PostgREST does apply.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(deletedAt, forKey: .deletedAt)
+        try container.encode(name, forKey: .name)
+        try container.encode(roasterName, forKey: .roasterName)
+        try container.encode(country, forKey: .country)
+        try container.encode(region, forKey: .region)
+        try container.encode(farm, forKey: .farm)
+        try container.encode(varietal, forKey: .varietal)
+        try container.encode(process, forKey: .process)
+        try container.encode(roastLevel, forKey: .roastLevel)
+        try container.encode(roastDate, forKey: .roastDate)
+        try container.encode(roasterNotes, forKey: .roasterNotes)
+        try container.encode(myFlavorTags, forKey: .myFlavorTags)
+        try container.encode(finishedAt, forKey: .finishedAt)
+        try container.encode(pendingNextPourover, forKey: .pendingNextPourover)
+        try container.encode(pendingNextEspresso, forKey: .pendingNextEspresso)
+    }
 }
 
 struct BrewDTO: SupabaseRow {
@@ -158,6 +186,25 @@ struct BrewDTO: SupabaseRow {
         brew.taste = taste
         brew.nextRecipeDraft = nextRecipeDraft
         brew.photoRemotePath = photoPath
+    }
+
+    // See BeanDTO.encode(to:): explicit encoding forces nil Optionals (notably
+    // `nextRecipeDraft`, cleared when a brew's plan-next toggle is turned off) to serialize as
+    // JSON `null` instead of being omitted, so PostgREST's upsert actually clears the column.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(deletedAt, forKey: .deletedAt)
+        try container.encode(brewedAt, forKey: .brewedAt)
+        try container.encode(methodRaw, forKey: .methodRaw)
+        try container.encode(brewers, forKey: .brewers)
+        try container.encode(recipe, forKey: .recipe)
+        try container.encode(taste, forKey: .taste)
+        try container.encode(nextRecipeDraft, forKey: .nextRecipeDraft)
+        try container.encode(beanID, forKey: .beanID)
+        try container.encode(photoPath, forKey: .photoPath)
     }
 }
 

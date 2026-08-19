@@ -52,6 +52,18 @@ Last-writer-wins is row-granular, not field-granular. Two people editing differe
 same row concurrently can still overwrite one another. Revisit this before the collaborative web
 app becomes heavily used.
 
+Swift's synthesized `Encodable` calls `encodeIfPresent` for `Optional` properties, which omits
+the key entirely when the value is `nil`. PostgREST's upsert only overwrites columns present in
+the JSON body, so a field cleared back to `nil` client-side (discarding a bean's pending
+next-brew plan, reopening a finished bean, clearing a bag fact, turning off a brew's plan-next
+toggle) would silently fail to clear server-side: the stale value survives the "successful" push
+and reappears on the very next pull, even on the same device. `BeanDTO` and `BrewDTO` therefore
+implement `encode(to:)` explicitly so every field — including a nil one — is always encoded,
+turning `nil` into an explicit JSON `null` that PostgREST does apply. Any future nullable column
+that can be cleared after being set needs the same treatment (see
+`SupabaseDTOTests.clearedOptionalFieldsEncodeAsExplicitNullNotOmittedKeys`). The web PWA is not
+affected — it builds plain JS objects and sends `null` explicitly rather than omitting the key.
+
 Web mutations additionally carry the exact raw `updated_at` originally loaded and conditionally
 match both it and `id`. A zero-row update is returned as a stale-write conflict so the editor
 refreshes instead of silently replacing a newer iOS or web edit. Inserts cannot overwrite an
