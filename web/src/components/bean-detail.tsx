@@ -54,6 +54,7 @@ import {
 import { mutate } from "@/lib/client-mutations";
 import { RecipeEditor } from "@/components/recipe-editor";
 import { ChangeChips, RecipeReadout } from "@/components/recipe-readout";
+import { PhotoViewer, type PreviewPhoto } from "@/components/photo-viewer";
 
 export default function BeanDetail({
   data,
@@ -328,13 +329,20 @@ function CharacterCard({
   bean: BeanRow;
   photos: Notebook["beanPhotos"];
 }) {
-  const hero = photoUrl(
-    "bean-photos",
-    photos.find((photo) => photo.remote_path)?.remote_path ?? null,
-  );
+  const [preview, setPreview] = useState<PreviewPhoto | null>(null);
+  const photoUrls = photos
+    .map((photo) => photoUrl("bean-photos", photo.remote_path))
+    .filter((url): url is string => !!url);
+  const hero = photoUrls[0] ?? null;
   return (
     <Card className="overflow-hidden py-0">
-      <div className="relative aspect-[16/10] bg-muted">
+      <button
+        type="button"
+        className="relative block aspect-[16/10] w-full bg-muted disabled:cursor-default"
+        disabled={!hero}
+        aria-label={hero ? `View ${bean.name} bag photo` : undefined}
+        onClick={() => hero && setPreview({ urls: photoUrls, index: 0 })}
+      >
         {hero ? (
           <Image
             src={hero}
@@ -348,7 +356,7 @@ function CharacterCard({
             <ImageIcon className="text-muted-foreground" />
           </div>
         )}
-      </div>
+      </button>
       <CardHeader className="pt-5">
         <p className="overline">
           {bean.roaster_name || "Coffee character card"}
@@ -361,30 +369,28 @@ function CharacterCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 pb-5">
-        {photos.length > 1 && (
+        {photoUrls.length > 1 && (
           <div
             className="grid grid-cols-4 gap-2"
             aria-label="Bag photo gallery"
           >
-            {photos.slice(1, 5).map((photo, index) => {
-              const source = photoUrl("bean-photos", photo.remote_path);
-              return (
-                <div
-                  key={photo.id}
-                  className="relative aspect-square overflow-hidden rounded-lg border bg-muted"
-                >
-                  {source && (
-                    <Image
-                      src={source}
-                      alt={`${bean.name} bag detail ${index + 2}`}
-                      fill
-                      sizes="10rem"
-                      className="object-cover"
-                    />
-                  )}
-                </div>
-              );
-            })}
+            {photoUrls.slice(1, 5).map((url, i) => (
+              <button
+                key={url}
+                type="button"
+                className="relative aspect-square overflow-hidden rounded-lg border bg-muted"
+                aria-label={`View ${bean.name} bag photo ${i + 2}`}
+                onClick={() => setPreview({ urls: photoUrls, index: i + 1 })}
+              >
+                <Image
+                  src={url}
+                  alt={`${bean.name} bag detail ${i + 2}`}
+                  fill
+                  sizes="10rem"
+                  className="object-cover"
+                />
+              </button>
+            ))}
           </div>
         )}
         <dl className="grid grid-cols-2 gap-3 text-sm">
@@ -433,6 +439,11 @@ function CharacterCard({
           </div>
         )}
       </CardContent>
+      <PhotoViewer
+        photo={preview}
+        onIndexChange={(index) => setPreview((p) => p && { ...p, index })}
+        onClose={() => setPreview(null)}
+      />
     </Card>
   );
 }
@@ -603,6 +614,7 @@ function HistoryCard({
   refresh: () => Promise<void>;
 }) {
   const [working, setWorking] = useState(false);
+  const [preview, setPreview] = useState<PreviewPhoto | null>(null);
   const changes = previous ? brewDiff(previous.recipe, brew.recipe) : [];
   async function deleteBrew() {
     if (working) return;
@@ -705,7 +717,17 @@ function HistoryCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {brew.photo_path && (
-          <div className="relative aspect-video overflow-hidden rounded-xl border bg-muted">
+          <button
+            type="button"
+            className="relative aspect-video overflow-hidden rounded-xl border bg-muted"
+            aria-label="View brew photo"
+            onClick={() =>
+              setPreview({
+                urls: [photoUrl("brew-photos", brew.photo_path)!],
+                index: 0,
+              })
+            }
+          >
             <Image
               src={photoUrl("brew-photos", brew.photo_path)!}
               alt="Brew"
@@ -713,8 +735,13 @@ function HistoryCard({
               sizes="(max-width:1024px) 100vw, 40vw"
               className="object-cover"
             />
-          </div>
+          </button>
         )}
+        <PhotoViewer
+        photo={preview}
+        onIndexChange={(index) => setPreview((p) => p && { ...p, index })}
+        onClose={() => setPreview(null)}
+      />
         <RecipeReadout recipe={brew.recipe} />
         <ChangeChips changes={changes} />
         <div className="flex flex-wrap gap-1">

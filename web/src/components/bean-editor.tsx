@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { PhotoViewer, type PreviewPhoto } from "@/components/photo-viewer";
 import { TermField } from "@/components/term-field";
 import { fetchNotebook, mutate, normalizePhoto } from "@/lib/client-mutations";
 import {
@@ -51,6 +52,7 @@ export function BeanEditor({ id }: { id?: string }) {
   const router = useRouter();
   const [form, setForm] = useState<Form>(blank),
     [flavorTags, setFlavorTags] = useState<string[]>([]),
+    [preview, setPreview] = useState<PreviewPhoto | null>(null),
     [row, setRow] = useState<BeanRow | null>(null),
     [photos, setPhotos] = useState<PhotoDraft[]>([]),
     [removedPhotos, setRemovedPhotos] = useState<BeanPhotoRow[]>([]),
@@ -268,6 +270,9 @@ export function BeanEditor({ id }: { id?: string }) {
         </Button>
       </main>
     );
+  const previewUrls = photos
+    .map((photo) => photo.preview)
+    .filter((url): url is string => !!url);
   return (
     <EditorFrame title={row ? "Edit bean" : "Add bean"}>
       <form onSubmit={save}>
@@ -309,7 +314,19 @@ export function BeanEditor({ id }: { id?: string }) {
                           key={photo.id}
                           className="overflow-hidden rounded-xl border bg-card"
                         >
-                          <div className="relative aspect-square bg-muted">
+                          <button
+                            type="button"
+                            className="relative block aspect-square w-full bg-muted disabled:cursor-default"
+                            disabled={!photo.preview}
+                            aria-label={`View bag photo ${index + 1}`}
+                            onClick={() =>
+                              photo.preview &&
+                              setPreview({
+                                urls: previewUrls,
+                                index: previewUrls.indexOf(photo.preview),
+                              })
+                            }
+                          >
                             {photo.preview && (
                               <Image
                                 src={photo.preview}
@@ -319,7 +336,7 @@ export function BeanEditor({ id }: { id?: string }) {
                                 className="object-cover"
                               />
                             )}
-                          </div>
+                          </button>
                           <div className="flex items-center justify-center gap-1 p-1">
                             <Button
                               type="button"
@@ -355,6 +372,13 @@ export function BeanEditor({ id }: { id?: string }) {
                       ))}
                     </div>
                   )}
+                  <PhotoViewer
+                    photo={preview}
+                    onIndexChange={(index) =>
+                      setPreview((p) => p && { ...p, index })
+                    }
+                    onClose={() => setPreview(null)}
+                  />
                   <Input
                     id="photos"
                     type="file"

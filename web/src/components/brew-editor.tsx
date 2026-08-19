@@ -26,6 +26,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { RecipeEditor } from "./recipe-editor";
 import { RecipeChips } from "./recipe-readout";
 import { NumericStepper } from "./numeric-stepper";
+import { PhotoViewer, type PreviewPhoto } from "./photo-viewer";
 import { TermField } from "./term-field";
 import { TimeInput } from "./time-input";
 import { fetchNotebook, mutate, normalizePhoto } from "@/lib/client-mutations";
@@ -36,6 +37,7 @@ import {
   gramText,
   newPourover,
   normalizeTerms,
+  photoUrl,
   singlePendingPlanPatch,
   suggestedTargets,
   timeText,
@@ -73,6 +75,7 @@ export function BrewEditor({
     [next, setNext] = useState<Recipe>(emptyRecipe()),
     [photoFile, setPhotoFile] = useState<File | null>(null),
     [removePhoto, setRemovePhoto] = useState(false),
+    [preview, setPreview] = useState<PreviewPhoto | null>(null),
     [brewedAt, setBrewedAt] = useState(new Date().toISOString()),
     [loadError, setLoadError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -682,16 +685,33 @@ export function BrewEditor({
             <CardContent>
               <FieldGroup>
                 {existing?.photo_path && !removePhoto && (
-                  <div className="relative aspect-video overflow-hidden rounded-xl border bg-muted">
+                  <button
+                    type="button"
+                    className="relative aspect-video overflow-hidden rounded-xl border bg-muted"
+                    aria-label="View brew photo"
+                    onClick={() =>
+                      setPreview({
+                        urls: [photoUrl("brew-photos", existing.photo_path)!],
+                        index: 0,
+                      })
+                    }
+                  >
                     <Image
-                      src={`/api/photos/brew-photos/${existing.photo_path}`}
+                      src={photoUrl("brew-photos", existing.photo_path)!}
                       alt="Saved brew"
                       fill
                       sizes="(max-width:672px) 100vw, 640px"
                       className="object-cover"
                     />
-                  </div>
+                  </button>
                 )}
+                <PhotoViewer
+                  photo={preview}
+                  onIndexChange={(index) =>
+                    setPreview((p) => p && { ...p, index })
+                  }
+                  onClose={() => setPreview(null)}
+                />
                 <Field>
                   <FieldLabel htmlFor="brew-photo">
                     {existing?.photo_path ? "Replace photo" : "Add photo"}
