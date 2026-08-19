@@ -45,17 +45,19 @@ export function NumericStepper({
     onChange(next);
   };
   return (
-    <div className={`flex min-w-0 items-stretch ${className ?? ""}`}>
+    <div
+      className={`flex h-11 min-w-0 items-stretch overflow-hidden rounded-lg border border-input bg-transparent ${className ?? ""}`}
+    >
       <Button
         type="button"
-        variant="outline"
+        variant="ghost"
         size="icon"
-        className="shrink-0 rounded-r-none border-r-0"
+        className="h-full w-11 shrink-0 rounded-none text-primary hover:bg-primary/10 hover:text-primary disabled:opacity-30"
         disabled={disabled || (min !== undefined && (value ?? 0) <= min)}
         aria-label={`Decrease ${id}`}
         onClick={() => bump(-1)}
       >
-        <Minus />
+        <Minus className="size-4" />
       </Button>
       <Input
         id={id}
@@ -63,7 +65,7 @@ export function NumericStepper({
         inputMode={integer ? "numeric" : "decimal"}
         pattern={integer ? "-?[0-9]*" : "-?[0-9]*[.,]?[0-9]*"}
         disabled={disabled}
-        className="min-w-0 rounded-none text-center font-mono tabular-nums"
+        className="h-full min-w-0 flex-1 rounded-none border-x border-input bg-transparent text-center font-mono tabular-nums shadow-none focus-visible:ring-0"
         value={text}
         onChange={(event) => {
           const raw = event.target.value.replace(",", ".");
@@ -87,14 +89,14 @@ export function NumericStepper({
       />
       <Button
         type="button"
-        variant="outline"
+        variant="ghost"
         size="icon"
-        className="shrink-0 rounded-l-none border-l-0"
+        className="h-full w-11 shrink-0 rounded-none text-primary hover:bg-primary/10 hover:text-primary disabled:opacity-30"
         disabled={disabled || (max !== undefined && (value ?? 0) >= max)}
         aria-label={`Increase ${id}`}
         onClick={() => bump(1)}
       >
-        <Plus />
+        <Plus className="size-4" />
       </Button>
     </div>
   );

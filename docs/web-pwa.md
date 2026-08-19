@@ -98,7 +98,10 @@ so the hero order is visible before save. `RecipeEditor` also remembers newly ty
 their stepped/stepless classification through the guarded mutation API. Numeric recipe controls
 use iOS-style decrement/increment buttons and mobile numeric keypads; signed controls retain
 negative entry. Observed drawdown and shot time use the native digit-entry convention, so `230`
-becomes `2:30` while the stopwatch remains available.
+becomes `2:30` while the stopwatch remains available. While tasting, "Previous notes" mirrors
+`BrewCaptureView.swift`'s `PreviousNotesView`: the last few brews' terms are grouped one card per
+brewed date (collapsed to the most recent, "Show N more" reveals the rest) and keep positive/negative
+coloring, rather than one undifferentiated flat list of chips.
 
 Photo uploads are also decoded at the server boundary and rejected unless they are valid JPEGs
 whose width and height are both at most 1400 pixels. On the read side, `/api/photos/[bucket]/...`

@@ -29,22 +29,29 @@ fresh visual gap worth keeping around.
   Recipe tab — grind, temp, dose, ratio, water, pours, bloom, TDD, and the expanded pour
   breakdown — is a single card. Each row is icon/label on the left, a big legible value on the
   right, with a `−`/`+` stepper cluster only where a quick nudge is the common move. No nested
-  card-within-card, no border around every field.
+  card-within-card, no border around every field. `web/src/components/recipe-editor.tsx` matches
+  this now (`FieldRow`, full-width, icon + label left / compact stepper right) instead of the
+  2-/3-column grids it used to force each field into — those grids were also the "squished, PWA
+  doesn't use horizontal space well" complaint, since a 3-part stepper barely fits a half-width
+  grid cell on a phone.
 - **Pour breakdown rows are plain typed text, not boxed steppers.** `recipe-editor-pour-breakdown.jpg`:
   `#1  start – 0:15         60 g`, then a lighter `style / note (centre, aggressive…)` placeholder
   underneath — no border, no +/− buttons, just inline fields in a tight list.
-  `web/src/components/recipe-editor.tsx`'s pour rows currently use the shared `Field`/`Input`
-  components uniformly, which is why they still read as a "form" next to this.
+  `web/src/components/recipe-editor.tsx` matches this now (borderless inline fields, a `#`/`start –
+  end`/`to (g)` caption header once above the list rather than repeated per-row labels).
 - **The grinder picker is quick-pick chips above a text field**, not just a free-text input with an
   HTML `<datalist>` — `recipe-editor-grind.jpg` shows known grinders as tappable chips (checkmark
-  on the selected one), the text field below only for typing a new one.
+  on the selected one), the text field below only for typing a new one, a `Stepless` switch (not a
+  Stepped/Stepless tab pair), and a draggable ruler for stepless settings. `recipe-editor.tsx` and
+  the new `grind-ruler.tsx`/`ui/switch.tsx` match this now; the old "Stepless grinders use the
+  absolute dial…" explainer paragraph is gone (iOS never shows one).
 - **The Brewing tab's readout is a distinct big stat-grid**, not the icon-chip pills used in
   history (`RecipeReadout.swift`'s `pill()`). `brewing-phase-readout.jpg`: large bold
   `92°  20g  1:15  300g` with small caption labels underneath, `POUR PLAN` as a section label with
   an inline `bloom 0:45 · 3 pours · TDD 2:15` summary, then the same plain pour rows as the editor.
-  The PWA's brewing-phase "Follow the recipe" card (`brew-editor.tsx`) currently reuses the
-  history-style `RecipeChips` pills here instead of this stat-grid — a second, different gap from
-  the pour-breakdown one above.
+  `brew-editor.tsx`'s brewing-phase "Follow the recipe" card matches this now via
+  `BrewStatGrid`/`PourPlanList` in `recipe-readout.tsx`, instead of reusing the history-style
+  `RecipeChips` pills there.
 - **Roaster's Notes is an Enter-to-add chip input**, not a comma-separated free-text field.
   `edit-bean-roaster-notes.jpg` shows existing notes (`Apricot`, `Honey`, `Apple Tart`) as pills
   with a sparkle icon, an `Add...` field with a return-arrow icon below, and a caption
