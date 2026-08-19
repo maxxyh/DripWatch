@@ -16,6 +16,8 @@ keeping around.
 | `recipe-editor-grind.jpg` | New Pourover, Recipe tab: grind picker with quick-pick chips |
 | `recipe-editor-pour-breakdown.jpg` | New Pourover, Recipe tab, scrolled: pour breakdown expanded |
 | `brewing-phase-readout.jpg` | New Pourover, Brewing tab: live stat-grid readout + stopwatch |
+| `edit-bean-top.jpg` | Edit Bean: bag photo + scan, Bean name/roaster |
+| `edit-bean-roaster-notes.jpg` | Edit Bean, scrolled: Process/Roast level chips, Roaster's Notes |
 
 ## What these show that the source alone doesn't
 
@@ -39,6 +41,14 @@ keeping around.
   The PWA's brewing-phase "Follow the recipe" card (`brew-editor.tsx`) currently reuses the
   history-style `RecipeChips` pills here instead of this stat-grid — a second, different gap from
   the pour-breakdown one above.
+- **Roaster's Notes is an Enter-to-add chip input**, not a comma-separated free-text field.
+  `edit-bean-roaster-notes.jpg` shows existing notes (`Apricot`, `Honey`, `Apple Tart`) as pills
+  with a sparkle icon, an `Add...` field with a return-arrow icon below, and a caption
+  ("The roaster's tasting notes — shown on the shelf and while you taste") pinned under the card
+  rather than inside it. `edit-bean-top.jpg` also confirms there is no "My flavor tags" field
+  anywhere in Edit Bean — roaster notes is the only editable tasting-note surface on a bean.
+  `web/src/components/bean-editor.tsx` matches this now (`TermField` for roaster notes, the
+  unused flavor-tags field removed).
 
 ## Adding more
 
