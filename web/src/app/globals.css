@@ -144,22 +144,6 @@
   .overline {
     @apply text-xs font-semibold uppercase tracking-[.14em] text-muted-foreground;
   }
-  .pour-rail {
-    @apply relative flex flex-wrap items-start justify-between gap-2 pt-3;
-  }
-  .pour-rail::before {
-    content: "";
-    @apply absolute left-3 right-3 top-6 h-px bg-border;
-  }
-  .pour-stop {
-    @apply relative flex min-w-10 flex-col items-center gap-2 text-xs;
-  }
-  .pour-stop > span {
-    @apply z-[1] grid size-7 place-items-center rounded-full border bg-card font-mono font-semibold text-primary;
-  }
-  .pour-stop > strong {
-    @apply font-mono;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

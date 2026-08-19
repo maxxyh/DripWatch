@@ -1,8 +1,8 @@
 "use client";
 import Image from "next/image";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pause, Play, X } from "lucide-react";
+import { ArrowLeft, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +24,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { RecipeEditor } from "./recipe-editor";
+import { RecipeChips } from "./recipe-readout";
 import { NumericStepper } from "./numeric-stepper";
+import { PhotoViewer, type PreviewPhoto } from "./photo-viewer";
+import { TermField } from "./term-field";
 import { TimeInput } from "./time-input";
 import { fetchNotebook, mutate, normalizePhoto } from "@/lib/client-mutations";
 import {
@@ -34,7 +37,7 @@ import {
   gramText,
   newPourover,
   normalizeTerms,
-  recipeSummary,
+  photoUrl,
   singlePendingPlanPatch,
   suggestedTargets,
   timeText,
@@ -72,6 +75,7 @@ export function BrewEditor({
     [next, setNext] = useState<Recipe>(emptyRecipe()),
     [photoFile, setPhotoFile] = useState<File | null>(null),
     [removePhoto, setRemovePhoto] = useState(false),
+    [preview, setPreview] = useState<PreviewPhoto | null>(null),
     [brewedAt, setBrewedAt] = useState(new Date().toISOString()),
     [loadError, setLoadError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -544,7 +548,7 @@ export function BrewEditor({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              <p className="font-mono text-lg">{recipeSummary(recipe)}</p>
+              <RecipeChips recipe={recipe} />
               {method === "pourover" && (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {pourTargets.map(
@@ -681,16 +685,33 @@ export function BrewEditor({
             <CardContent>
               <FieldGroup>
                 {existing?.photo_path && !removePhoto && (
-                  <div className="relative aspect-video overflow-hidden rounded-xl border bg-muted">
+                  <button
+                    type="button"
+                    className="relative aspect-video overflow-hidden rounded-xl border bg-muted"
+                    aria-label="View brew photo"
+                    onClick={() =>
+                      setPreview({
+                        urls: [photoUrl("brew-photos", existing.photo_path)!],
+                        index: 0,
+                      })
+                    }
+                  >
                     <Image
-                      src={`/api/photos/brew-photos/${existing.photo_path}`}
+                      src={photoUrl("brew-photos", existing.photo_path)!}
                       alt="Saved brew"
                       fill
                       sizes="(max-width:672px) 100vw, 640px"
                       className="object-cover"
                     />
-                  </div>
+                  </button>
                 )}
+                <PhotoViewer
+                  photo={preview}
+                  onIndexChange={(index) =>
+                    setPreview((p) => p && { ...p, index })
+                  }
+                  onClose={() => setPreview(null)}
+                />
                 <Field>
                   <FieldLabel htmlFor="brew-photo">
                     {existing?.photo_path ? "Replace photo" : "Add photo"}
@@ -819,7 +840,8 @@ function TasteEditor({
           <TermField
             label="Positive (+)"
             values={taste.positives}
-            positive
+            tone="positive"
+            placeholder="honey"
             onAdd={(v) => addTerm(v, true)}
             onRemove={(v) =>
               setTaste({
@@ -831,6 +853,8 @@ function TasteEditor({
           <TermField
             label="Negative (−)"
             values={taste.negatives}
+            tone="negative"
+            placeholder="dry"
             onAdd={(v) => addTerm(v, false)}
             onRemove={(v) =>
               setTaste({
@@ -953,55 +977,5 @@ function TasteEditor({
         </FieldGroup>
       </CardContent>
     </Card>
-  );
-}
-function TermField({
-  label,
-  values,
-  positive = false,
-  onAdd,
-  onRemove,
-}: {
-  label: string;
-  values: string[];
-  positive?: boolean;
-  onAdd: (v: string) => void;
-  onRemove: (v: string) => void;
-}) {
-  const inputId = useId();
-  return (
-    <Field>
-      <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
-      <Input
-        id={inputId}
-        placeholder={positive ? "honey" : "dry"}
-        onBlur={(event) => {
-          onAdd(event.currentTarget.value);
-          event.currentTarget.value = "";
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            onAdd(e.currentTarget.value);
-            e.currentTarget.value = "";
-          }
-        }}
-      />
-      <div className="flex flex-wrap gap-2">
-        {values.map((v) => (
-          <Button
-            key={v}
-            type="button"
-            size="sm"
-            variant="outline"
-            className={positive ? "text-positive" : "text-negative"}
-            onClick={() => onRemove(v)}
-          >
-            {positive ? "+" : "−"} {v}
-            <X data-icon="inline-end" />
-          </Button>
-        ))}
-      </div>
-    </Field>
   );
 }

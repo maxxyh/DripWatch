@@ -1,7 +1,14 @@
-import type { GrindSetting, Recipe, Taste } from "./domain-schema";
+import type {
+  BeanRow,
+  BrewRow,
+  GrindSetting,
+  Recipe,
+  Taste,
+} from "./domain-schema";
 
 export type {
   GrindSetting,
+  Pour,
   Recipe,
   Taste,
   BeanRow,
@@ -158,6 +165,145 @@ export function recipeSummary(r: Recipe) {
   if (r.surfWaitSec !== undefined) p.push(`${r.surfWaitSec}s surf`);
   if (r.steamModeSec !== undefined) p.push(`${r.steamModeSec}s steam`);
   return p.join(" · ");
+}
+/// Full brew detail as Markdown — bean facts, the complete recipe, how it tasted, and the
+/// planned next brew — for pasting into an AI (or a friend) for brewing advice. Mirrors the iOS
+/// app's BrewMarkdown so a brew copied from either platform reads the same.
+export function brewMarkdown(
+  bean: BeanRow,
+  brew: BrewRow,
+  plannedNext?: Recipe | null,
+): string {
+  const sections: string[] = [];
+  const name = bean.name.trim() || "Untitled bean";
+  const methodLabel = brew.method_raw === "pourover" ? "Pourover" : "Espresso";
+  sections.push(`# ${name} — ${methodLabel}`);
+  sections.push(
+    [
+      bean.roaster_name?.trim(),
+      new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+        new Date(brew.brewed_at),
+      ),
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  );
+  const facts = beanFactLines(bean);
+  if (facts.length) sections.push(`**Bean**\n${facts.join("\n")}`);
+  sections.push(
+    `**Recipe**\n${recipeLines(brew.recipe, brew.method_raw).join("\n")}`,
+  );
+  const taste = tasteLines(brew.taste);
+  if (taste.length) sections.push(`**Taste**\n${taste.join("\n")}`);
+  if (plannedNext)
+    sections.push(
+      `**Planned next brew**\n${recipeLines(plannedNext, brew.method_raw).join("\n")}`,
+    );
+  return sections.join("\n\n");
+}
+function beanFactLines(bean: BeanRow): string[] {
+  const lines: string[] = [];
+  const add = (label: string, value?: string | null) => {
+    const v = value?.trim();
+    if (v) lines.push(`- ${label}: ${v}`);
+  };
+  const origin = [bean.region, bean.country]
+    .filter((x) => x?.trim())
+    .join(", ");
+  add("Origin", origin || undefined);
+  add("Farm", bean.farm);
+  add("Variety", bean.varietal);
+  add("Process", bean.process);
+  add("Roast", bean.roast_level);
+  if (bean.roast_date)
+    add(
+      "Roasted",
+      new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+        new Date(bean.roast_date),
+      ),
+    );
+  if (bean.roaster_notes?.trim())
+    add(
+      "Roaster notes",
+      bean.roaster_notes
+        .split(",")
+        .map((n) => n.trim())
+        .filter(Boolean)
+        .join(", "),
+    );
+  return lines;
+}
+function recipeLines(r: Recipe, method: "pourover" | "espresso"): string[] {
+  const lines: string[] = [];
+  const g = grind(r);
+  if (g) lines.push(`- Grind: ${grindDisplay(g)}`);
+  if (method === "espresso") {
+    if (r.doseGrams !== undefined) lines.push(`- Dose: ${gramText(r.doseGrams)} g`);
+    if (r.yieldGrams !== undefined)
+      lines.push(`- Yield: ${gramText(r.yieldGrams)} g`);
+    if (r.doseGrams && r.yieldGrams)
+      lines.push(`- Ratio: 1:${ratioText(r.yieldGrams / r.doseGrams)}`);
+    if (r.shotTimeSec !== undefined)
+      lines.push(`- Shot time: ${timeText(r.shotTimeSec)}`);
+    if (r.preInfusionSec !== undefined)
+      lines.push(`- Pre-infusion: ${r.preInfusionSec}s`);
+    if (r.surfWaitSec !== undefined) lines.push(`- Surf wait: ${r.surfWaitSec}s`);
+    if (r.steamModeSec !== undefined)
+      lines.push(`- Steam mode: ${r.steamModeSec}s`);
+    if (r.waterTempC !== undefined) lines.push(`- Temp: ${r.waterTempC}°C`);
+  } else {
+    if (r.waterTempC !== undefined) lines.push(`- Temp: ${r.waterTempC}°C`);
+    if (r.doseGrams !== undefined) lines.push(`- Dose: ${gramText(r.doseGrams)} g`);
+    if (r.ratio !== undefined) lines.push(`- Ratio: 1:${ratioText(r.ratio)}`);
+    const water = effectiveWater(r);
+    if (water !== undefined) lines.push(`- Water: ${gramText(water)} g`);
+    if (r.pourCount !== undefined) lines.push(`- Pours: ${r.pourCount}`);
+    if (r.bloomTimeSec !== undefined)
+      lines.push(`- Bloom: ${timeText(r.bloomTimeSec)}`);
+    if (r.totalDrawdownSec !== undefined)
+      lines.push(`- Drawdown (TDD): ${timeText(r.totalDrawdownSec)}`);
+    const pours = [...r.pours]
+      .sort((a, b) => a.order - b.order)
+      .filter(
+        (p) =>
+          p.toGrams !== undefined ||
+          p.startSec !== undefined ||
+          p.style?.trim(),
+      );
+    if (pours.length) {
+      lines.push("- Pour-by-pour:");
+      for (const p of pours) {
+        const parts: string[] = [];
+        if (p.startSec !== undefined)
+          parts.push(
+            p.endSec !== undefined
+              ? `${timeText(p.startSec)}–${timeText(p.endSec)}`
+              : timeText(p.startSec),
+          );
+        if (p.toGrams !== undefined) parts.push(`→ ${gramText(p.toGrams)} g`);
+        if (p.style?.trim()) parts.push(`(${p.style.trim()})`);
+        lines.push(`  - #${p.order}: ${parts.join(" ")}`);
+      }
+    }
+  }
+  if (r.notes?.trim()) lines.push(`- Notes: ${r.notes.trim()}`);
+  if (!lines.length) lines.push("- (no parameters recorded)");
+  return lines;
+}
+function tasteLines(t: Taste): string[] {
+  const lines: string[] = [];
+  if (t.positives.length) lines.push(`- Good: ${t.positives.join(", ")}`);
+  if (t.negatives.length) lines.push(`- Off: ${t.negatives.join(", ")}`);
+  const balance = (["acidity", "sweetness", "bitterness", "body"] as const)
+    .filter((axis) => t.balance[axis] !== undefined)
+    .map((axis) => `${axis} ${t.balance[axis]}/5`);
+  if (balance.length) lines.push(`- Balance: ${balance.join(", ")}`);
+  if (t.rating)
+    lines.push(
+      `- Rating: ${"★".repeat(t.rating)}${"☆".repeat(Math.max(0, 5 - t.rating))}`,
+    );
+  if (t.note?.trim()) lines.push(`- Note: ${t.note.trim()}`);
+  return lines;
 }
 export function brewDiff(a: Recipe, b: Recipe) {
   const o: string[] = [];

@@ -23,8 +23,10 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { NumericStepper } from "./numeric-stepper";
+import { TimeInput } from "./time-input";
 import type { GrinderRow, Recipe } from "@/lib/domain";
 import {
   effectiveWater,
@@ -59,6 +61,11 @@ export function RecipeEditor({
   grinders: GrinderRow[];
 }) {
   const [savedGrinders, setSavedGrinders] = useState<GrinderRow[]>([]);
+  // Timings are off by default — reveal them only when there's already a schedule to follow, so
+  // the form never invents times you'd have to delete.
+  const [showTimes, setShowTimes] = useState(() =>
+    recipe.pours.some((pour) => pour.startSec !== undefined || pour.endSec !== undefined),
+  );
   const knownGrinders = [...savedGrinders, ...grinders].filter(
     (grinder, index, rows) =>
       rows.findIndex((candidate) => candidate.id === grinder.id) === index,
@@ -150,11 +157,7 @@ export function RecipeEditor({
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader>
-          <CardTitle>Everyday recipe</CardTitle>
-          <CardDescription>
-            Keep the absolute recipe visible; open specialist detail only when
-            needed.
-          </CardDescription>
+          <CardTitle>Recipe</CardTitle>
         </CardHeader>
         <CardContent>
           <FieldGroup>
@@ -304,12 +307,19 @@ export function RecipeEditor({
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="bloom">Bloom (sec)</FieldLabel>
-                    <NumericStepper
+                    <FieldLabel htmlFor="bloom">Bloom</FieldLabel>
+                    <TimeInput
                       id="bloom"
-                      min={0}
-                      value={recipe.bloomTimeSec}
+                      seconds={recipe.bloomTimeSec}
                       onChange={(value) => set("bloomTimeSec", value)}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="tdd">Drawdown (TDD)</FieldLabel>
+                    <TimeInput
+                      id="tdd"
+                      seconds={recipe.totalDrawdownSec}
+                      onChange={(value) => set("totalDrawdownSec", value)}
                     />
                   </Field>
                 </>
@@ -341,96 +351,138 @@ export function RecipeEditor({
         </CardContent>
       </Card>
       {method === "pourover" && recipe.pours.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pour rail</CardTitle>
-            <CardDescription>
-              Cumulative scale targets. The final stop is the exact total water.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <FieldGroup>
-              {recipe.pours.map((pour, i) => (
-                <div
-                  key={pour.id}
-                  className="grid grid-cols-[2rem_1fr_1fr] items-end gap-2"
-                >
-                  <strong className="pb-2 font-mono text-primary">
-                    {i + 1}
-                  </strong>
-                  <Field>
-                    <FieldLabel htmlFor={`pour-${i}`}>To grams</FieldLabel>
-                    <NumericStepper
-                      id={`pour-${i}`}
-                      step={0.1}
-                      min={0}
-                      value={pour.toGrams}
-                      onChange={(grams) => {
-                        const pours = [...recipe.pours],
-                          nextPour = { ...pour, toGrams: grams };
-                        pours[i] = nextPour;
-                        onChange(
-                          i === pours.length - 1
-                            ? reflowPours(
-                                setTotalWater({ ...recipe, pours }, grams),
-                              )
-                            : { ...recipe, pours },
-                        );
-                      }}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor={`start-${i}`}>Start sec</FieldLabel>
-                    <NumericStepper
-                      id={`start-${i}`}
-                      min={0}
-                      value={pour.startSec}
-                      onChange={(value) => {
-                        const pours = [...recipe.pours];
-                        pours[i] = {
-                          ...pour,
-                          startSec: value,
-                        };
-                        onChange({ ...recipe, pours });
-                      }}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor={`end-${i}`}>End sec</FieldLabel>
-                    <NumericStepper
-                      id={`end-${i}`}
-                      min={0}
-                      value={pour.endSec}
-                      onChange={(value) => {
-                        const pours = [...recipe.pours];
-                        pours[i] = {
-                          ...pour,
-                          endSec: value,
-                        };
-                        onChange({ ...recipe, pours });
-                      }}
-                    />
-                  </Field>
-                  <Field className="col-start-2 col-span-2">
-                    <FieldLabel htmlFor={`style-${i}`}>Pour style</FieldLabel>
-                    <Input
-                      id={`style-${i}`}
-                      value={pour.style ?? ""}
-                      onChange={(event) => {
-                        const pours = [...recipe.pours];
-                        pours[i] = {
-                          ...pour,
-                          style: event.target.value || undefined,
-                        };
-                        onChange({ ...recipe, pours });
-                      }}
-                    />
-                  </Field>
-                </div>
-              ))}
-            </FieldGroup>
-          </CardContent>
-        </Card>
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CardHeader>
+              <CollapsibleTrigger
+                render={
+                  <Button variant="ghost" className="w-full justify-between" />
+                }
+              >
+                Pour breakdown
+                <ChevronDown data-icon="inline-end" />
+              </CollapsibleTrigger>
+              <CardDescription>
+                The last pour always matches total water.
+              </CardDescription>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent>
+                <FieldGroup>
+                  <Toggle
+                    variant="outline"
+                    size="sm"
+                    className="self-start"
+                    pressed={showTimes}
+                    onPressedChange={setShowTimes}
+                  >
+                    Add pour timings
+                  </Toggle>
+                  {recipe.pours.map((pour, i) => {
+                    const setGrams = (grams?: number) => {
+                      const pours = [...recipe.pours],
+                        nextPour = { ...pour, toGrams: grams };
+                      pours[i] = nextPour;
+                      onChange(
+                        i === pours.length - 1 && grams !== undefined
+                          ? reflowPours(
+                              setTotalWater({ ...recipe, pours }, grams),
+                            )
+                          : { ...recipe, pours },
+                      );
+                    };
+                    return (
+                      <div
+                        key={pour.id}
+                        className={
+                          showTimes
+                            ? "grid grid-cols-[2rem_1fr_4rem_4rem] items-end gap-2"
+                            : "flex items-end gap-2"
+                        }
+                      >
+                        <strong className="pb-2 font-mono text-primary">
+                          {i + 1}
+                        </strong>
+                        {/* A plain compact field, not the +/- StepperCluster used for the
+                            always-visible fields above: three of those side by side can't fit a
+                            phone's width, so per-pour rows use narrow typed fields instead — the
+                            same tradeoff the native app makes for this exact row. */}
+                        <Field className={showTimes ? "" : "flex-1"}>
+                          <FieldLabel htmlFor={`pour-${i}`}>To grams</FieldLabel>
+                          <Input
+                            id={`pour-${i}`}
+                            type="text"
+                            inputMode="decimal"
+                            className="text-center font-mono tabular-nums"
+                            value={pour.toGrams ?? ""}
+                            onChange={(event) => {
+                              const raw = event.target.value.replace(",", ".");
+                              if (!/^\d*\.?\d*$/.test(raw)) return;
+                              // A bare "." matches the pattern above but parses to NaN — treat
+                              // it (and any other non-finite mid-typing state) as "keep waiting
+                              // for more digits" rather than committing it to recipe state.
+                              const parsed = raw === "" ? undefined : Number(raw);
+                              if (parsed !== undefined && !Number.isFinite(parsed))
+                                return;
+                              setGrams(parsed);
+                            }}
+                          />
+                        </Field>
+                        {showTimes && (
+                          <>
+                            <Field>
+                              <FieldLabel htmlFor={`start-${i}`}>
+                                Start
+                              </FieldLabel>
+                              <TimeInput
+                                id={`start-${i}`}
+                                seconds={pour.startSec}
+                                onChange={(value) => {
+                                  const pours = [...recipe.pours];
+                                  pours[i] = { ...pour, startSec: value };
+                                  onChange({ ...recipe, pours });
+                                }}
+                              />
+                            </Field>
+                            <Field>
+                              <FieldLabel htmlFor={`end-${i}`}>End</FieldLabel>
+                              <TimeInput
+                                id={`end-${i}`}
+                                seconds={pour.endSec}
+                                onChange={(value) => {
+                                  const pours = [...recipe.pours];
+                                  pours[i] = { ...pour, endSec: value };
+                                  onChange({ ...recipe, pours });
+                                }}
+                              />
+                            </Field>
+                            <Field className="col-start-2 col-span-3">
+                              <FieldLabel htmlFor={`style-${i}`}>
+                                Pour style
+                              </FieldLabel>
+                              <Input
+                                id={`style-${i}`}
+                                value={pour.style ?? ""}
+                                onChange={(event) => {
+                                  const pours = [...recipe.pours];
+                                  pours[i] = {
+                                    ...pour,
+                                    style: event.target.value || undefined,
+                                  };
+                                  onChange({ ...recipe, pours });
+                                }}
+                              />
+                            </Field>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </FieldGroup>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
       <Collapsible>
         <Card>

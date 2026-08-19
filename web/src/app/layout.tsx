@@ -25,6 +25,13 @@ export const metadata: Metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
+  // Deliberately no pinch/double-tap zoom: this is an app shell, not a document, and iOS auto-
+  // zooms on focusing any text input under 16px regardless of this setting. Fixing every input's
+  // font size for that one case is more fragile than just turning zoom off outright, but it does
+  // trade away zoom as an accessibility tool for low-vision users — acceptable here since the UI
+  // itself must stay legible at 1x (see Theme/Dynamic Type invariants in CLAUDE.md).
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fafafa" },

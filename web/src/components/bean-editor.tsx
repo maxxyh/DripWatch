@@ -21,8 +21,9 @@ import {
   FieldLegend,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { PhotoViewer, type PreviewPhoto } from "@/components/photo-viewer";
+import { TermField } from "@/components/term-field";
 import { fetchNotebook, mutate, normalizePhoto } from "@/lib/client-mutations";
 import {
   normalizeTerm,
@@ -40,8 +41,6 @@ const blank = {
   process: "",
   roast_level: "",
   roast_date: "",
-  roaster_notes: "",
-  my_flavor_tags: "",
 };
 type Form = typeof blank;
 type PhotoDraft =
@@ -50,6 +49,8 @@ type PhotoDraft =
 export function BeanEditor({ id }: { id?: string }) {
   const router = useRouter();
   const [form, setForm] = useState<Form>(blank),
+    [roasterNotes, setRoasterNotes] = useState<string[]>([]),
+    [preview, setPreview] = useState<PreviewPhoto | null>(null),
     [row, setRow] = useState<BeanRow | null>(null),
     [photos, setPhotos] = useState<PhotoDraft[]>([]),
     [removedPhotos, setRemovedPhotos] = useState<BeanPhotoRow[]>([]),
@@ -97,9 +98,10 @@ export function BeanEditor({ id }: { id?: string }) {
           process: b.process ?? "",
           roast_level: b.roast_level ?? "",
           roast_date: b.roast_date?.slice(0, 10) ?? "",
-          roaster_notes: b.roaster_notes ?? "",
-          my_flavor_tags: b.my_flavor_tags.join(", "),
         });
+        setRoasterNotes(
+          b.roaster_notes ? normalizeTerms(b.roaster_notes.split(",")) : [],
+        );
         })
         .catch(() =>
           setLoadError(
@@ -112,6 +114,10 @@ export function BeanEditor({ id }: { id?: string }) {
   }, [id]);
   const change = (key: keyof Form, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
+  const addRoasterNote = (term: string) =>
+    setRoasterNotes((notes) => normalizeTerms([...notes, term]));
+  const removeRoasterNote = (term: string) =>
+    setRoasterNotes((notes) => notes.filter((note) => note !== term));
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() && !photos.length) {
@@ -140,9 +146,8 @@ export function BeanEditor({ id }: { id?: string }) {
           roast_date: form.roast_date
             ? new Date(`${form.roast_date}T12:00:00Z`).toISOString()
             : null,
-          roaster_notes:
-            normalizeTerms(form.roaster_notes.split(",")).join(", ") || null,
-          my_flavor_tags: normalizeTerms(form.my_flavor_tags.split(",")),
+          roaster_notes: roasterNotes.length ? roasterNotes.join(", ") : null,
+          my_flavor_tags: row?.my_flavor_tags ?? [],
           finished_at: row?.finished_at ?? null,
           pending_next_pourover: row?.pending_next_pourover ?? null,
           pending_next_espresso: row?.pending_next_espresso ?? null,
@@ -263,6 +268,9 @@ export function BeanEditor({ id }: { id?: string }) {
         </Button>
       </main>
     );
+  const previewUrls = photos
+    .map((photo) => photo.preview)
+    .filter((url): url is string => !!url);
   return (
     <EditorFrame title={row ? "Edit bean" : "Add bean"}>
       <form onSubmit={save}>
@@ -304,7 +312,19 @@ export function BeanEditor({ id }: { id?: string }) {
                           key={photo.id}
                           className="overflow-hidden rounded-xl border bg-card"
                         >
-                          <div className="relative aspect-square bg-muted">
+                          <button
+                            type="button"
+                            className="relative block aspect-square w-full bg-muted disabled:cursor-default"
+                            disabled={!photo.preview}
+                            aria-label={`View bag photo ${index + 1}`}
+                            onClick={() =>
+                              photo.preview &&
+                              setPreview({
+                                urls: previewUrls,
+                                index: previewUrls.indexOf(photo.preview),
+                              })
+                            }
+                          >
                             {photo.preview && (
                               <Image
                                 src={photo.preview}
@@ -314,7 +334,7 @@ export function BeanEditor({ id }: { id?: string }) {
                                 className="object-cover"
                               />
                             )}
-                          </div>
+                          </button>
                           <div className="flex items-center justify-center gap-1 p-1">
                             <Button
                               type="button"
@@ -350,6 +370,13 @@ export function BeanEditor({ id }: { id?: string }) {
                       ))}
                     </div>
                   )}
+                  <PhotoViewer
+                    photo={preview}
+                    onIndexChange={(index) =>
+                      setPreview((p) => p && { ...p, index })
+                    }
+                    onClose={() => setPreview(null)}
+                  />
                   <Input
                     id="photos"
                     type="file"
@@ -411,6 +438,9 @@ export function BeanEditor({ id }: { id?: string }) {
                     onChange={(event) => change("process", event.target.value)}
                     placeholder="Washed, co-ferment, thermal shock…"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    or pick a common one
+                  </p>
                   <ToggleGroup
                     value={[form.process]}
                     onValueChange={(v) => change("process", v[0] ?? "")}
@@ -448,27 +478,13 @@ export function BeanEditor({ id }: { id?: string }) {
                     onChange={(e) => change("roast_date", e.target.value)}
                   />
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="notes">Roaster notes</FieldLabel>
-                  <Textarea
-                    id="notes"
-                    value={form.roaster_notes}
-                    onChange={(e) => change("roaster_notes", e.target.value)}
-                    placeholder="Dates, vanilla, apple"
-                  />
-                  <FieldDescription>
-                    Separate printed notes with commas to create chips.
-                  </FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="tags">My flavor tags</FieldLabel>
-                  <Input
-                    id="tags"
-                    value={form.my_flavor_tags}
-                    onChange={(e) => change("my_flavor_tags", e.target.value)}
-                    placeholder="honey, apple"
-                  />
-                </Field>
+                <TermField
+                  label="Roaster notes"
+                  values={roasterNotes}
+                  placeholder="Dates, vanilla, apple"
+                  onAdd={addRoasterNote}
+                  onRemove={removeRoasterNote}
+                />
               </FieldGroup>
             </CardContent>
           </Card>

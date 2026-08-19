@@ -47,16 +47,14 @@ import {
 import type { BeanRow, BrewRow, Notebook, Recipe } from "@/lib/domain";
 import {
   brewDiff,
-  grind,
-  grindDisplay,
+  brewMarkdown,
   photoUrl,
-  recipeSummary,
   singlePendingPlanPatch,
-  suggestedTargets,
-  timeText,
 } from "@/lib/domain";
 import { mutate } from "@/lib/client-mutations";
 import { RecipeEditor } from "@/components/recipe-editor";
+import { ChangeChips, RecipeReadout } from "@/components/recipe-readout";
+import { PhotoViewer, type PreviewPhoto } from "@/components/photo-viewer";
 
 export default function BeanDetail({
   data,
@@ -274,16 +272,37 @@ export default function BeanDetail({
           </div>
           {brews.length ? (
             <div className="flex flex-col gap-3">
-              {brews.map((b, i) => (
-                <HistoryCard
-                  key={b.id}
-                  brew={b}
-                  bean={bean}
-                  previous={brews[i + 1]}
-                  offline={offline}
-                  refresh={refresh}
-                />
-              ))}
+              {(() => {
+                // The plan only ever seeds from the newest brew of its own method (brews is
+                // sorted newest-first, so the first match per method is that brew) — computed
+                // once here rather than per row, so HistoryCard's copy button can still answer
+                // "is this brew latest?" without an O(n²) rescan of the history.
+                const latestPourover = brews.find(
+                  (b) => b.method_raw === "pourover",
+                )?.id;
+                const latestEspresso = brews.find(
+                  (b) => b.method_raw === "espresso",
+                )?.id;
+                return brews.map((b, i) => {
+                  const plannedNext =
+                    b.id === latestPourover
+                      ? bean.pending_next_pourover
+                      : b.id === latestEspresso
+                        ? bean.pending_next_espresso
+                        : null;
+                  return (
+                    <HistoryCard
+                      key={b.id}
+                      brew={b}
+                      bean={bean}
+                      previous={brews[i + 1]}
+                      plannedNext={plannedNext}
+                      offline={offline}
+                      refresh={refresh}
+                    />
+                  );
+                });
+              })()}
             </div>
           ) : (
             <Empty className="border">
@@ -310,13 +329,20 @@ function CharacterCard({
   bean: BeanRow;
   photos: Notebook["beanPhotos"];
 }) {
-  const hero = photoUrl(
-    "bean-photos",
-    photos.find((photo) => photo.remote_path)?.remote_path ?? null,
-  );
+  const [preview, setPreview] = useState<PreviewPhoto | null>(null);
+  const photoUrls = photos
+    .map((photo) => photoUrl("bean-photos", photo.remote_path))
+    .filter((url): url is string => !!url);
+  const hero = photoUrls[0] ?? null;
   return (
     <Card className="overflow-hidden py-0">
-      <div className="relative aspect-[16/10] bg-muted">
+      <button
+        type="button"
+        className="relative block aspect-[16/10] w-full bg-muted disabled:cursor-default"
+        disabled={!hero}
+        aria-label={hero ? `View ${bean.name} bag photo` : undefined}
+        onClick={() => hero && setPreview({ urls: photoUrls, index: 0 })}
+      >
         {hero ? (
           <Image
             src={hero}
@@ -330,7 +356,7 @@ function CharacterCard({
             <ImageIcon className="text-muted-foreground" />
           </div>
         )}
-      </div>
+      </button>
       <CardHeader className="pt-5">
         <p className="overline">
           {bean.roaster_name || "Coffee character card"}
@@ -343,30 +369,28 @@ function CharacterCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 pb-5">
-        {photos.length > 1 && (
+        {photoUrls.length > 1 && (
           <div
             className="grid grid-cols-4 gap-2"
             aria-label="Bag photo gallery"
           >
-            {photos.slice(1, 5).map((photo, index) => {
-              const source = photoUrl("bean-photos", photo.remote_path);
-              return (
-                <div
-                  key={photo.id}
-                  className="relative aspect-square overflow-hidden rounded-lg border bg-muted"
-                >
-                  {source && (
-                    <Image
-                      src={source}
-                      alt={`${bean.name} bag detail ${index + 2}`}
-                      fill
-                      sizes="10rem"
-                      className="object-cover"
-                    />
-                  )}
-                </div>
-              );
-            })}
+            {photoUrls.slice(1, 5).map((url, i) => (
+              <button
+                key={url}
+                type="button"
+                className="relative aspect-square overflow-hidden rounded-lg border bg-muted"
+                aria-label={`View ${bean.name} bag photo ${i + 2}`}
+                onClick={() => setPreview({ urls: photoUrls, index: i + 1 })}
+              >
+                <Image
+                  src={url}
+                  alt={`${bean.name} bag detail ${i + 2}`}
+                  fill
+                  sizes="10rem"
+                  className="object-cover"
+                />
+              </button>
+            ))}
           </div>
         )}
         <dl className="grid grid-cols-2 gap-3 text-sm">
@@ -402,19 +426,12 @@ function CharacterCard({
             ))}
           </div>
         )}
-        {bean.my_flavor_tags.length > 0 && (
-          <div>
-            <p className="mb-2 text-xs text-muted-foreground">Your tags</p>
-            <div className="flex flex-wrap gap-2">
-              {bean.my_flavor_tags.map((tag) => (
-                <Badge key={tag} variant="secondary">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
       </CardContent>
+      <PhotoViewer
+        photo={preview}
+        onIndexChange={(index) => setPreview((p) => p && { ...p, index })}
+        onClose={() => setPreview(null)}
+      />
     </Card>
   );
 }
@@ -529,11 +546,11 @@ function PlanCard({
             </Button>
           </div>
         </div>
-        <CardDescription>
-          {changes.length
-            ? `Change from last brew: ${changes.join(" · ")}`
-            : "Your next method-specific recipe"}
-        </CardDescription>
+        {changes.length > 0 && (
+          <CardDescription>
+            <ChangeChips changes={changes} />
+          </CardDescription>
+        )}
       </CardHeader>
       <CardContent>
         {editing ? (
@@ -569,78 +586,23 @@ function PlanCard({
     </Card>
   );
 }
-function RecipeReadout({ recipe }: { recipe: Recipe }) {
-  const g = grind(recipe),
-    savedTargets = recipe.pours.map((pour) => pour.toGrams),
-    targets =
-      savedTargets.length && savedTargets.every((value) => value !== undefined)
-        ? (savedTargets as number[])
-        : suggestedTargets(recipe, recipe.pourCount ?? 0);
-  return (
-    <div className="flex flex-col gap-3">
-      {g && (
-        <p className="font-mono text-lg font-semibold text-primary">
-          {grindDisplay(g)}
-        </p>
-      )}
-      <p className="font-mono text-sm">
-        {recipeSummary(recipe) || "Recipe details not set"}
-      </p>
-      {targets.length > 0 && (
-        <div
-          aria-label={`Cumulative pour targets: ${targets.join(", ")} grams`}
-          className="pour-rail"
-        >
-          {targets.map((t, i) => (
-            <div key={i} className="pour-stop">
-              <span>{i + 1}</span>
-              <strong>{Math.round(t)}g</strong>
-            </div>
-          ))}
-        </div>
-      )}
-      {recipe.pours.some(
-        (pour) =>
-          pour.startSec !== undefined ||
-          pour.endSec !== undefined ||
-          !!pour.style,
-      ) && (
-        <ol className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {recipe.pours.map((pour) => (
-            <li key={pour.id}>
-              Pour {pour.order}
-              {pour.startSec !== undefined
-                ? ` · ${timeText(pour.startSec)}${
-                    pour.endSec !== undefined
-                      ? `–${timeText(pour.endSec)}`
-                      : ""
-                  }`
-                : ""}
-              {pour.style ? ` · ${pour.style}` : ""}
-            </li>
-          ))}
-        </ol>
-      )}
-      {recipe.notes && (
-        <p className="text-sm text-muted-foreground">{recipe.notes}</p>
-      )}
-    </div>
-  );
-}
 function HistoryCard({
   brew,
   bean,
   previous,
+  plannedNext,
   offline,
   refresh,
 }: {
   brew: BrewRow;
   bean: BeanRow;
   previous?: BrewRow;
+  plannedNext?: Recipe | null;
   offline: boolean;
   refresh: () => Promise<void>;
 }) {
   const [working, setWorking] = useState(false);
+  const [preview, setPreview] = useState<PreviewPhoto | null>(null);
   const changes = previous ? brewDiff(previous.recipe, brew.recipe) : [];
   async function deleteBrew() {
     if (working) return;
@@ -682,22 +644,9 @@ function HistoryCard({
               size="icon"
               aria-label="Copy brew as text"
               onClick={async () => {
-                const text = [
-                  new Intl.DateTimeFormat(undefined, {
-                    dateStyle: "medium",
-                  }).format(new Date(brew.brewed_at)),
-                  brew.method_raw,
-                  recipeSummary(brew.recipe),
-                  brew.recipe.notes,
-                  [...brew.taste.positives.map((term) => `+ ${term}`),
-                    ...brew.taste.negatives.map((term) => `− ${term}`)].join(
-                    " · ",
-                  ),
-                  brew.taste.note,
-                ]
-                  .filter(Boolean)
-                  .join("\n");
-                await navigator.clipboard.writeText(text);
+                await navigator.clipboard.writeText(
+                  brewMarkdown(bean, brew, plannedNext),
+                );
                 toast.success("Brew copied");
               }}
             >
@@ -756,7 +705,17 @@ function HistoryCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {brew.photo_path && (
-          <div className="relative aspect-video overflow-hidden rounded-xl border bg-muted">
+          <button
+            type="button"
+            className="relative aspect-video overflow-hidden rounded-xl border bg-muted"
+            aria-label="View brew photo"
+            onClick={() =>
+              setPreview({
+                urls: [photoUrl("brew-photos", brew.photo_path)!],
+                index: 0,
+              })
+            }
+          >
             <Image
               src={photoUrl("brew-photos", brew.photo_path)!}
               alt="Brew"
@@ -764,14 +723,15 @@ function HistoryCard({
               sizes="(max-width:1024px) 100vw, 40vw"
               className="object-cover"
             />
-          </div>
+          </button>
         )}
+        <PhotoViewer
+        photo={preview}
+        onIndexChange={(index) => setPreview((p) => p && { ...p, index })}
+        onClose={() => setPreview(null)}
+      />
         <RecipeReadout recipe={brew.recipe} />
-        {changes.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            → {changes.join(" · ")}
-          </p>
-        )}
+        <ChangeChips changes={changes} />
         <div className="flex flex-wrap gap-1">
           {brew.taste.positives.map((x) => (
             <Badge key={`+${x}`} variant="outline" className="text-positive">
