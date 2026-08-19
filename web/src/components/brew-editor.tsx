@@ -20,6 +20,7 @@ import {
   FieldLegend,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -248,7 +249,7 @@ export function BrewEditor({
   }, [running, elapsed]);
   if (loadError)
     return (
-      <main className="mx-auto max-w-2xl px-4 py-20">
+      <main className="mx-auto w-full max-w-2xl px-4 py-20">
         <h1 className="text-2xl font-semibold">Brew editor unavailable</h1>
         <p className="mt-2 text-muted-foreground">{loadError}</p>
         <Button className="mt-5" variant="outline" onClick={() => router.back()}>
@@ -257,7 +258,7 @@ export function BrewEditor({
       </main>
     );
   if (!book || !bean)
-    return <main className="mx-auto max-w-2xl px-4 py-20">Loading brew…</main>;
+    return <main className="mx-auto w-full max-w-2xl px-4 py-20">Loading brew…</main>;
   const activeBean = bean;
   const previousTastes = book.brews
     .filter(
@@ -476,7 +477,7 @@ export function BrewEditor({
     }
   }
   return (
-    <main className="mx-auto max-w-2xl px-4 py-5">
+    <main className="mx-auto w-full max-w-2xl px-4 py-5">
       <Button variant="ghost" onClick={() => router.back()}>
         <ArrowLeft data-icon="inline-start" />
         Back
@@ -737,19 +738,22 @@ export function BrewEditor({
                   automatically.
                 </p>
               </div>
-              <ToggleGroup
-                value={plan ? ["plan"] : []}
-                onValueChange={(v) => {
-                  const on = v.includes("plan");
-                  setPlan(on);
-                  if (on && !planSeeded) {
-                    setNext(asPlanSeed(recipe));
-                    setPlanSeeded(true);
-                  }
-                }}
-              >
-                <ToggleGroupItem value="plan">Plan next brew</ToggleGroupItem>
-              </ToggleGroup>
+              <div className="flex items-center justify-between gap-3">
+                <FieldLabel htmlFor="plan-next-brew" className="text-sm font-normal">
+                  Plan a change for next time
+                </FieldLabel>
+                <Switch
+                  id="plan-next-brew"
+                  checked={plan}
+                  onCheckedChange={(on) => {
+                    setPlan(on);
+                    if (on && !planSeeded) {
+                      setNext(asPlanSeed(recipe));
+                      setPlanSeeded(true);
+                    }
+                  }}
+                />
+              </div>
               {plan && (
                 <>
                   <p className="text-sm text-muted-foreground">

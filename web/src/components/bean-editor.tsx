@@ -257,10 +257,10 @@ export function BeanEditor({ id }: { id?: string }) {
     setPhotos((current) => [...current, ...additions]);
   }
   if (loading)
-    return <main className="mx-auto max-w-2xl px-4 py-20">Loading bean…</main>;
+    return <main className="mx-auto w-full max-w-2xl px-4 py-20">Loading bean…</main>;
   if (loadError)
     return (
-      <main className="mx-auto max-w-2xl px-4 py-20">
+      <main className="mx-auto w-full max-w-2xl px-4 py-20">
         <h1 className="text-2xl font-semibold">Bean editor unavailable</h1>
         <p className="mt-2 text-muted-foreground">{loadError}</p>
         <Button className="mt-5" variant="outline" onClick={() => router.back()}>

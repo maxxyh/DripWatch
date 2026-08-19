@@ -125,7 +125,7 @@ export function NotebookApp({
   if (!notebook.data && !notebook.error) return <LoadingShelf />;
   if (notebook.error && !notebook.data)
     return (
-      <main className="mx-auto max-w-2xl px-4 py-20">
+      <main className="mx-auto w-full max-w-2xl px-4 py-20">
         <Alert variant="destructive">
           <CloudOff />
           <AlertTitle>Notebook unavailable</AlertTitle>
@@ -241,7 +241,7 @@ function Shelf({ data, offline }: { data: Notebook; offline: boolean }) {
     fresh = active.filter((b) => !b.finished_at),
     finished = active.filter((b) => b.finished_at);
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6 md:px-8">
+    <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <p className="overline">Shared coffee notebook</p>

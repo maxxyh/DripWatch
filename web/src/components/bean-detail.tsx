@@ -75,7 +75,7 @@ export default function BeanDetail({
   const bean = data.beans.find((b) => b.id === beanId && !b.deleted_at);
   if (!bean)
     return (
-      <main className="mx-auto max-w-3xl px-4 py-16">
+      <main className="mx-auto w-full max-w-3xl px-4 py-16">
         <Empty>
           <EmptyHeader>
             <EmptyTitle>Bean not found</EmptyTitle>
@@ -154,7 +154,7 @@ export default function BeanDetail({
     }
   }
   return (
-    <main className="mx-auto max-w-6xl px-4 py-5 md:px-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-5 md:px-8">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <Link href="/" className={buttonVariants({ variant: "ghost" })}>
           <ArrowLeft data-icon="inline-start" />

@@ -485,9 +485,6 @@ export function RecipeEditor({
                 Pour breakdown
                 <ChevronDown data-icon="inline-end" />
               </CollapsibleTrigger>
-              <CardDescription>
-                The last pour always matches total water.
-              </CardDescription>
             </CardHeader>
             <CollapsibleContent>
               <CardContent>
@@ -613,9 +610,10 @@ export function RecipeEditor({
                 <Button variant="ghost" className="w-full justify-between" />
               }
             >
-              Specialist detail
+              Additional notes
               <ChevronDown data-icon="inline-end" />
             </CollapsibleTrigger>
+            <CardDescription>e.g. pouring technique, blow chaff</CardDescription>
           </CardHeader>
           <CollapsibleContent>
             <CardContent>
