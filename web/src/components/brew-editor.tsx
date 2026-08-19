@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pause, Play } from "lucide-react";
+import { ArrowLeft, CornerDownRight, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +24,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { RecipeEditor } from "./recipe-editor";
-import { BrewStatGrid, PourPlanList, RoasterNoteChips } from "./recipe-readout";
+import {
+  BrewStatGrid,
+  ChangeChips,
+  PourPlanList,
+  RoasterNoteChips,
+} from "./recipe-readout";
 import { NumericStepper } from "./numeric-stepper";
 import { PhotoViewer, type PreviewPhoto } from "./photo-viewer";
 import { TermField } from "./term-field";
@@ -33,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { fetchNotebook, mutate, normalizePhoto } from "@/lib/client-mutations";
 import {
   asPlanSeed,
+  brewDiff,
   emptyRecipe,
   emptyTaste,
   newPourover,
@@ -712,40 +718,63 @@ export function BrewEditor({
             </CardContent>
           </Card>
           {canPlanNext && (
-            <Card className="border-primary/40 bg-primary/5 [border-style:dashed]">
-              <CardHeader>
-                <CardTitle>Plan the next {method}</CardTitle>
-                <CardDescription>
+            // Deliberately not wrapped in a Card: RecipeEditor renders its own "Recipe" card, so
+            // an outer card here would double the horizontal padding around every field (a
+            // dashed card's CardContent padding, plus RecipeEditor's own Card's padding again) —
+            // exactly what made this section feel squeezed next to the rest of the flow. iOS's
+            // RecipeEditor.swift has no card of its own for the same reason: whichever card wraps
+            // it is the only one.
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2 text-primary">
+                  <CornerDownRight className="size-4" aria-hidden />
+                  <h2 className="font-heading text-base font-medium">
+                    Plan the next {method}
+                  </h2>
+                </div>
+                <p className="text-sm text-muted-foreground">
                   Measured shot time and drawdown are never carried forward
                   automatically.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ToggleGroup
-                  value={plan ? ["plan"] : []}
-                  onValueChange={(v) => {
-                    const on = v.includes("plan");
-                    setPlan(on);
-                    if (on && !planSeeded) {
-                      setNext(asPlanSeed(recipe));
-                      setPlanSeeded(true);
-                    }
-                  }}
-                >
-                  <ToggleGroupItem value="plan">Plan next brew</ToggleGroupItem>
-                </ToggleGroup>
-                {plan && (
-                  <div className="mt-4">
-                    <RecipeEditor
-                      recipe={next}
-                      onChange={setNext}
-                      method={method}
-                      grinders={book.grinders.filter((g) => !g.deleted_at)}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </p>
+              </div>
+              <ToggleGroup
+                value={plan ? ["plan"] : []}
+                onValueChange={(v) => {
+                  const on = v.includes("plan");
+                  setPlan(on);
+                  if (on && !planSeeded) {
+                    setNext(asPlanSeed(recipe));
+                    setPlanSeeded(true);
+                  }
+                }}
+              >
+                <ToggleGroupItem value="plan">Plan next brew</ToggleGroupItem>
+              </ToggleGroup>
+              {plan && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Pre-filled with what you just brewed — change only what
+                    you want.
+                  </p>
+                  {(() => {
+                    const planChanges = brewDiff(recipe, next);
+                    return planChanges.length > 0 ? (
+                      <ChangeChips changes={planChanges} />
+                    ) : (
+                      <p className="text-xs text-muted-foreground/70">
+                        No changes yet — tweak a value below.
+                      </p>
+                    );
+                  })()}
+                  <RecipeEditor
+                    recipe={next}
+                    onChange={setNext}
+                    method={method}
+                    grinders={book.grinders.filter((g) => !g.deleted_at)}
+                  />
+                </>
+              )}
+            </div>
           )}
         </div>
       )}

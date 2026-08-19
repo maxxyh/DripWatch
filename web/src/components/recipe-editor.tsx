@@ -52,7 +52,7 @@ import {
 import { mutate } from "@/lib/client-mutations";
 import { cn } from "@/lib/utils";
 
-const VALUE_WIDTH = "w-36";
+const VALUE_WIDTH = "w-40";
 
 /// One full-width row — icon + label on the left, a compact value/stepper on the right — mirroring
 /// the native app's continuous list of plain rows (RecipeEditor.swift's `NumberField`/`DecimalField`)
@@ -320,7 +320,7 @@ export function RecipeEditor({
                         <Input
                           type="text"
                           inputMode="decimal"
-                          className="w-16 text-center font-mono tabular-nums"
+                          className="w-20 px-1 text-center font-mono tabular-nums"
                           value={recipe.grindMajor ?? ""}
                           onChange={(event) => {
                             const raw = event.target.value.replace(",", ".");

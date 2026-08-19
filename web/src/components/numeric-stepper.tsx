@@ -17,7 +17,16 @@ type NumericStepperProps = {
   className?: string;
 };
 
-const display = (value?: number) => (value === undefined ? "" : String(value));
+/// Rounds to the field's own step precision and trims a trailing ".0" — a value computed from
+/// other fields (e.g. total water = dose × ratio) can otherwise carry many floating-point decimal
+/// places (`312.6165…`) that no reasonable column width can fit, mirroring iOS's
+/// `.precision(.fractionLength(0...1))` display formatting.
+function display(value: number | undefined, precision: number) {
+  if (value === undefined) return "";
+  let out = value.toFixed(precision);
+  if (precision > 0 && out.includes(".")) out = out.replace(/0+$/, "").replace(/\.$/, "");
+  return out;
+}
 
 export function NumericStepper({
   id,
@@ -30,18 +39,18 @@ export function NumericStepper({
   integer = Number.isInteger(step),
   className,
 }: NumericStepperProps) {
+  const precision = String(step).split(".")[1]?.length ?? 0;
   const [draft, setDraft] = useState(() => ({
     source: value,
-    text: display(value),
+    text: display(value, precision),
   }));
-  const text = Object.is(draft.source, value) ? draft.text : display(value);
+  const text = Object.is(draft.source, value) ? draft.text : display(value, precision);
   const clamp = (candidate: number) =>
     Math.min(max ?? Infinity, Math.max(min ?? -Infinity, candidate));
   const bump = (direction: -1 | 1) => {
-    const precision = String(step).split(".")[1]?.length ?? 0;
     const candidate = clamp((value ?? 0) + direction * step);
     const next = Number(candidate.toFixed(precision));
-    setDraft({ source: next, text: display(next) });
+    setDraft({ source: next, text: display(next, precision) });
     onChange(next);
   };
   return (
@@ -65,7 +74,7 @@ export function NumericStepper({
         inputMode={integer ? "numeric" : "decimal"}
         pattern={integer ? "-?[0-9]*" : "-?[0-9]*[.,]?[0-9]*"}
         disabled={disabled}
-        className="h-full min-w-0 flex-1 rounded-none border-x border-input bg-transparent text-center font-mono tabular-nums shadow-none focus-visible:ring-0"
+        className="h-full min-w-0 flex-1 rounded-none border-x border-input bg-transparent px-1 text-center font-mono tabular-nums shadow-none focus-visible:ring-0"
         value={text}
         onChange={(event) => {
           const raw = event.target.value.replace(",", ".");
@@ -85,7 +94,7 @@ export function NumericStepper({
           setDraft({ source: next, text: raw });
           onChange(next);
         }}
-        onBlur={() => setDraft({ source: value, text: display(value) })}
+        onBlur={() => setDraft({ source: value, text: display(value, precision) })}
       />
       <Button
         type="button"
