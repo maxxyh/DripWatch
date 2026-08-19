@@ -301,7 +301,6 @@ function Shelf({ data, offline }: { data: Notebook; offline: boolean }) {
 }
 function Masonry({ beans, data }: { beans: BeanRow[]; data: Notebook }) {
   return (
-            />
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-4">
       {beans.map((bean, index) => (
         <BeanCard
