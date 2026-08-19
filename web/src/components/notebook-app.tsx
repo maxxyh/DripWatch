@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronRight,
@@ -300,63 +300,18 @@ function Shelf({ data, offline }: { data: Notebook; offline: boolean }) {
   );
 }
 function Masonry({ beans, data }: { beans: BeanRow[]; data: Notebook }) {
-  const columnCount = useColumnCount();
-  const columns = balancedColumns(beans, columnCount);
   return (
-    <div
-      className="grid items-start gap-3 sm:gap-4"
-      style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
-    >
-      {columns.map((column, columnIndex) => (
-        <div key={columnIndex} className="flex min-w-0 flex-col gap-3 sm:gap-4">
-          {column.map((bean, index) => (
-            <BeanCard
-              key={bean.id}
-              bean={bean}
-              data={data}
-              priority={index < 2}
-            />
-          ))}
-        </div>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-4">
+      {beans.map((bean, index) => (
+        <BeanCard
+          key={bean.id}
+          bean={bean}
+          data={data}
+          priority={index < 2}
+        />
       ))}
     </div>
   );
-}
-function useColumnCount() {
-  return useSyncExternalStore(
-    (notify) => {
-      const tablet = matchMedia("(min-width: 640px)"),
-        desktop = matchMedia("(min-width: 1024px)");
-      tablet.addEventListener("change", notify);
-      desktop.addEventListener("change", notify);
-      return () => {
-        tablet.removeEventListener("change", notify);
-        desktop.removeEventListener("change", notify);
-      };
-    },
-    () =>
-      matchMedia("(min-width: 1024px)").matches
-        ? 4
-        : matchMedia("(min-width: 640px)").matches
-          ? 3
-          : 2,
-    () => 2,
-  );
-}
-function balancedColumns(beans: BeanRow[], count: number) {
-  const columns = Array.from({ length: count }, () => [] as BeanRow[]),
-    heights = Array.from({ length: count }, () => 0);
-  for (const bean of beans) {
-    const shortest = heights.indexOf(Math.min(...heights));
-    columns[shortest].push(bean);
-    const notes = (bean.roaster_notes ?? "").split(",").filter(Boolean).length;
-    heights[shortest] +=
-      174 +
-      (bean.roaster_name ? 16 : 0) +
-      (bean.process || bean.country ? 16 : 0) +
-      Math.min(notes, 3) * 30;
-  }
-  return columns;
 }
 function BeanCard({
   bean,
@@ -385,9 +340,9 @@ function BeanCard({
   return (
     <Link
       href={`/beans/${bean.id}`}
-      className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <Card className="overflow-hidden py-0 transition-transform motion-safe:group-hover:-translate-y-0.5">
+      <Card className="h-full overflow-hidden py-0 transition-transform motion-safe:group-hover:-translate-y-0.5">
         <div className="relative aspect-[4/3] bg-muted">
           {hero ? (
             <Image
