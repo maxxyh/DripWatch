@@ -354,7 +354,8 @@ function balancedColumns(beans: BeanRow[], count: number) {
       174 +
       (bean.roaster_name ? 16 : 0) +
       (bean.process || bean.country ? 16 : 0) +
-      Math.min(notes, 3) * 30;
+      Math.min(notes, 3) * 30 +
+      (bean.my_flavor_tags.length ? 30 : 0);
   }
   return columns;
 }
@@ -428,6 +429,15 @@ function BeanCard({
                 <Badge key={n} variant="outline">
                   <Sparkles aria-hidden />
                   {n}
+                </Badge>
+              ))}
+            </div>
+          )}
+          {bean.my_flavor_tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {bean.my_flavor_tags.map((tag) => (
+                <Badge key={tag} variant="secondary">
+                  {tag}
                 </Badge>
               ))}
             </div>

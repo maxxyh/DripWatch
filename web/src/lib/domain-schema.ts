@@ -16,6 +16,7 @@ export const pourSchema = z.object({
   endSec: optionalInt,
   style: z.string().optional(),
 });
+export type Pour = z.infer<typeof pourSchema>;
 export const recipeSchema = z.object({
   grinderName: z.string().optional(),
   grindMajor: optionalNumber,
