@@ -328,7 +328,17 @@ export function RecipeEditor({
                             const parsed = raw === "" ? undefined : Number(raw);
                             if (parsed !== undefined && !Number.isFinite(parsed))
                               return;
-                            set("grindMajor", parsed);
+                            // Clamp to GrindRuler's own range (min=0, max=100 below) — an
+                            // out-of-range value here leaves the ruler with no ticks to show
+                            // (its tick window is centered on `value`, clamped to its own
+                            // min/max, so a wildly out-of-range value collapses the window to
+                            // nothing) and an aria-valuenow outside its declared bounds.
+                            set(
+                              "grindMajor",
+                              parsed === undefined
+                                ? undefined
+                                : Math.min(100, Math.max(0, parsed)),
+                            );
                           }}
                         />
                       </div>
