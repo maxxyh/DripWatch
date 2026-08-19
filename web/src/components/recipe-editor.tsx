@@ -525,6 +525,7 @@ export function RecipeEditor({
                                 id={`start-${i}`}
                                 seconds={pour.startSec}
                                 placeholder="start"
+                                aria-label={`Pour ${i + 1} start time`}
                                 className="h-8 w-16 rounded-md border-0 bg-muted/60 text-center text-xs shadow-none focus-visible:ring-1"
                                 onChange={(value) => {
                                   const pours = [...recipe.pours];
@@ -537,6 +538,7 @@ export function RecipeEditor({
                                 id={`end-${i}`}
                                 seconds={pour.endSec}
                                 placeholder="end"
+                                aria-label={`Pour ${i + 1} end time`}
                                 className="h-8 w-16 rounded-md border-0 bg-muted/60 text-center text-xs shadow-none focus-visible:ring-1"
                                 onChange={(value) => {
                                   const pours = [...recipe.pours];

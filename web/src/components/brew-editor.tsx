@@ -2,9 +2,8 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pause, Play, Sparkles } from "lucide-react";
+import { ArrowLeft, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,7 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { RecipeEditor } from "./recipe-editor";
-import { BrewStatGrid, PourPlanList } from "./recipe-readout";
+import { BrewStatGrid, PourPlanList, RoasterNoteChips } from "./recipe-readout";
 import { NumericStepper } from "./numeric-stepper";
 import { PhotoViewer, type PreviewPhoto } from "./photo-viewer";
 import { TermField } from "./term-field";
@@ -549,14 +548,7 @@ export function BrewEditor({
                   <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                     Roaster notes
                   </span>
-                  <div className="flex flex-wrap gap-2">
-                    {activeBean.roaster_notes.split(",").map((n) => (
-                      <Badge key={n} variant="outline">
-                        <Sparkles />
-                        {n.trim()}
-                      </Badge>
-                    ))}
-                  </div>
+                  <RoasterNoteChips notes={activeBean.roaster_notes} />
                 </div>
               )}
             </CardContent>

@@ -8,11 +8,13 @@ import {
   Flame,
   Hourglass,
   Scale,
+  Sparkles,
   Thermometer,
   Timer,
   CupSoda,
   type LucideIcon,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Pour, Recipe } from "@/lib/domain";
 import {
@@ -24,6 +26,21 @@ import {
   suggestedTargets,
   timeText,
 } from "@/lib/domain";
+
+/// A bean's roaster's-notes string as tasting-note chips — shared by the bean detail character
+/// card and the brewing screen so the split/trim/rendering logic has exactly one home.
+export function RoasterNoteChips({ notes }: { notes: string }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {notes.split(",").map((n) => (
+        <Badge key={n} variant="outline">
+          <Sparkles />
+          {n.trim()}
+        </Badge>
+      ))}
+    </div>
+  );
+}
 
 type Chip = { icon: LucideIcon; text: string };
 

@@ -12,6 +12,7 @@ export function TimeInput({
   disabled,
   className,
   placeholder = "2:30",
+  "aria-label": ariaLabel,
 }: {
   id: string;
   seconds?: number;
@@ -19,6 +20,7 @@ export function TimeInput({
   disabled?: boolean;
   className?: string;
   placeholder?: string;
+  "aria-label"?: string;
 }) {
   const formatted = seconds === undefined ? "" : timeText(seconds);
   const [draft, setDraft] = useState({ source: seconds, text: formatted });
@@ -33,6 +35,7 @@ export function TimeInput({
       disabled={disabled}
       className={cn("font-mono tabular-nums", className)}
       placeholder={placeholder}
+      aria-label={ariaLabel}
       value={text}
       onChange={(event) => {
         const next = liveTimeEntry(event.target.value);

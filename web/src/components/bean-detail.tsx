@@ -11,7 +11,6 @@ import {
   Copy,
   Ellipsis,
   ImageIcon,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -53,7 +52,11 @@ import {
 } from "@/lib/domain";
 import { mutate } from "@/lib/client-mutations";
 import { RecipeEditor } from "@/components/recipe-editor";
-import { ChangeChips, RecipeReadout } from "@/components/recipe-readout";
+import {
+  ChangeChips,
+  RecipeReadout,
+  RoasterNoteChips,
+} from "@/components/recipe-readout";
 import { PhotoViewer, type PreviewPhoto } from "@/components/photo-viewer";
 
 export default function BeanDetail({
@@ -416,16 +419,7 @@ function CharacterCard({
               </div>
             ))}
         </dl>
-        {bean.roaster_notes && (
-          <div className="flex flex-wrap gap-2">
-            {bean.roaster_notes.split(",").map((n) => (
-              <Badge key={n} variant="outline">
-                <Sparkles />
-                {n.trim()}
-              </Badge>
-            ))}
-          </div>
-        )}
+        {bean.roaster_notes && <RoasterNoteChips notes={bean.roaster_notes} />}
       </CardContent>
       <PhotoViewer
         photo={preview}
