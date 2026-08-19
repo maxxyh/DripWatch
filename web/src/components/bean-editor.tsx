@@ -2,28 +2,15 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowLeft, ArrowUp, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldSet,
-  FieldLegend,
-} from "@/components/ui/field";
+import { Card, CardContent } from "@/components/ui/card";
+import { Field, FieldDescription, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PhotoViewer, type PreviewPhoto } from "@/components/photo-viewer";
 import { TermField } from "@/components/term-field";
+import { cn } from "@/lib/utils";
 import { fetchNotebook, mutate, normalizePhoto } from "@/lib/client-mutations";
 import {
   normalizeTerm,
@@ -31,6 +18,8 @@ import {
   type BeanPhotoRow,
   type BeanRow,
 } from "@/lib/domain";
+const PROCESSES = ["Washed", "Natural", "Honey", "Anaerobic"];
+const ROAST_LEVELS = ["Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"];
 const blank = {
   name: "",
   roaster_name: "",
@@ -274,114 +263,89 @@ export function BeanEditor({ id }: { id?: string }) {
   return (
     <EditorFrame title={row ? "Edit bean" : "Add bean"}>
       <form onSubmit={save}>
-        <FieldGroup>
-          <Card>
-            <CardHeader>
-              <CardTitle>Bag character</CardTitle>
-              <CardDescription>
-                The photo and printed facts make this bean recognizable on the
-                shelf.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="name">Coffee name</FieldLabel>
-                  <Input
-                    id="name"
-                    value={form.name}
-                    onChange={(e) => change("name", e.target.value)}
-                    placeholder="La Femme d'Argent"
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="roaster">Roaster</FieldLabel>
-                  <Input
-                    id="roaster"
-                    value={form.roaster_name}
-                    onChange={(e) => change("roaster_name", e.target.value)}
-                    placeholder="Voyager Craft Coffee"
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="photos">Bag photos</FieldLabel>
-                  {photos.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {photos.map((photo, index) => (
-                        <div
-                          key={photo.id}
-                          className="overflow-hidden rounded-xl border bg-card"
+        <FieldGroup className="gap-6">
+          <Section label="Photos">
+            <Card>
+              <CardContent className="flex flex-col gap-3">
+                {photos.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {photos.map((photo, index) => (
+                      <div
+                        key={photo.id}
+                        className="overflow-hidden rounded-xl border bg-card"
+                      >
+                        <button
+                          type="button"
+                          className="relative block aspect-square w-full bg-muted disabled:cursor-default"
+                          disabled={!photo.preview}
+                          aria-label={`View bag photo ${index + 1}`}
+                          onClick={() =>
+                            photo.preview &&
+                            setPreview({
+                              urls: previewUrls,
+                              index: previewUrls.indexOf(photo.preview),
+                            })
+                          }
                         >
-                          <button
+                          {photo.preview && (
+                            <Image
+                              src={photo.preview}
+                              alt={`Bag photo ${index + 1}`}
+                              fill
+                              sizes="(max-width:640px) 45vw, 210px"
+                              className="object-cover"
+                            />
+                          )}
+                        </button>
+                        <div className="flex items-center justify-center gap-1 p-1">
+                          <Button
                             type="button"
-                            className="relative block aspect-square w-full bg-muted disabled:cursor-default"
-                            disabled={!photo.preview}
-                            aria-label={`View bag photo ${index + 1}`}
-                            onClick={() =>
-                              photo.preview &&
-                              setPreview({
-                                urls: previewUrls,
-                                index: previewUrls.indexOf(photo.preview),
-                              })
-                            }
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Move photo ${index + 1} earlier`}
+                            disabled={index === 0}
+                            onClick={() => movePhoto(index, -1)}
                           >
-                            {photo.preview && (
-                              <Image
-                                src={photo.preview}
-                                alt={`Bag photo ${index + 1}`}
-                                fill
-                                sizes="(max-width:640px) 45vw, 210px"
-                                className="object-cover"
-                              />
-                            )}
-                          </button>
-                          <div className="flex items-center justify-center gap-1 p-1">
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              aria-label={`Move photo ${index + 1} earlier`}
-                              disabled={index === 0}
-                              onClick={() => movePhoto(index, -1)}
-                            >
-                              <ArrowUp />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              aria-label={`Move photo ${index + 1} later`}
-                              disabled={index === photos.length - 1}
-                              onClick={() => movePhoto(index, 1)}
-                            >
-                              <ArrowDown />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              aria-label={`Remove photo ${index + 1}`}
-                              onClick={() => removePhoto(index)}
-                            >
-                              <Trash2 />
-                            </Button>
-                          </div>
+                            <ArrowUp />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Move photo ${index + 1} later`}
+                            disabled={index === photos.length - 1}
+                            onClick={() => movePhoto(index, 1)}
+                          >
+                            <ArrowDown />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Remove photo ${index + 1}`}
+                            onClick={() => removePhoto(index)}
+                          >
+                            <Trash2 />
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  <PhotoViewer
-                    photo={preview}
-                    onIndexChange={(index) =>
-                      setPreview((p) => p && { ...p, index })
-                    }
-                    onClose={() => setPreview(null)}
-                  />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <PhotoViewer
+                  photo={preview}
+                  onIndexChange={(index) =>
+                    setPreview((p) => p && { ...p, index })
+                  }
+                  onClose={() => setPreview(null)}
+                />
+                <Field>
                   <Input
                     id="photos"
                     type="file"
                     accept="image/*"
                     multiple
+                    aria-label="Bag photos"
                     disabled={photos.length >= 5}
                     onChange={(event) => {
                       addPhotos(Array.from(event.target.files ?? []));
@@ -399,85 +363,101 @@ export function BeanEditor({ id }: { id?: string }) {
                     </p>
                   )}
                 </Field>
-              </FieldGroup>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Roaster facts</CardTitle>
-              <CardDescription>
-                Everything is optional; add only what the bag tells you.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {[
+              </CardContent>
+            </Card>
+          </Section>
+          <Section label="Bean">
+            <Card>
+              <CardContent className="divide-y divide-border py-0">
+                <PlainField label="Name" htmlFor="name">
+                  <Input
+                    id="name"
+                    className={plainInputClass}
+                    value={form.name}
+                    onChange={(e) => change("name", e.target.value)}
+                    placeholder="La Femme d'Argent"
+                  />
+                </PlainField>
+                <PlainField label="Roaster" htmlFor="roaster">
+                  <Input
+                    id="roaster"
+                    className={plainInputClass}
+                    value={form.roaster_name}
+                    onChange={(e) => change("roaster_name", e.target.value)}
+                    placeholder="Voyager Craft Coffee"
+                  />
+                </PlainField>
+              </CardContent>
+            </Card>
+          </Section>
+          <Section label="Origin">
+            <Card>
+              <CardContent className="divide-y divide-border py-0">
+                {(
+                  [
                     ["country", "Country"],
                     ["region", "Region"],
                     ["farm", "Farm"],
                     ["varietal", "Varietal"],
-                  ].map(([key, label]) => (
-                    <Field key={key}>
-                      <FieldLabel htmlFor={key}>{label}</FieldLabel>
-                      <Input
-                        id={key}
-                        value={form[key as keyof Form]}
-                        onChange={(e) =>
-                          change(key as keyof Form, e.target.value)
-                        }
-                      />
-                    </Field>
-                  ))}
-                </div>
-                <FieldSet>
-                  <FieldLegend>Process</FieldLegend>
+                  ] as const
+                ).map(([key, label]) => (
+                  <PlainField key={key} label={label} htmlFor={key}>
+                    <Input
+                      id={key}
+                      className={plainInputClass}
+                      value={form[key]}
+                      onChange={(e) => change(key, e.target.value)}
+                    />
+                  </PlainField>
+                ))}
+              </CardContent>
+            </Card>
+          </Section>
+          <Section label="Roast">
+            <Card>
+              <CardContent className="divide-y divide-border py-0">
+                <PlainField label="Process" htmlFor="process">
                   <Input
                     id="process"
+                    className={plainInputClass}
                     value={form.process}
                     onChange={(event) => change("process", event.target.value)}
                     placeholder="Washed, co-ferment, thermal shock…"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    or pick a common one
-                  </p>
-                  <ToggleGroup
-                    value={[form.process]}
-                    onValueChange={(v) => change("process", v[0] ?? "")}
-                  >
-                    <ToggleGroupItem value="Washed">Washed</ToggleGroupItem>
-                    <ToggleGroupItem value="Natural">Natural</ToggleGroupItem>
-                    <ToggleGroupItem value="Honey">Honey</ToggleGroupItem>
-                    <ToggleGroupItem value="Anaerobic">
-                      Anaerobic
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </FieldSet>
-                <Field>
-                  <FieldLabel htmlFor="roast">Roast level</FieldLabel>
+                  <ChipRow
+                    options={PROCESSES}
+                    value={form.process}
+                    onSelect={(value) => change("process", value)}
+                  />
+                </PlainField>
+                <PlainField label="Roast level" htmlFor="roast">
                   <Input
                     id="roast"
-                    list="roasts"
+                    className={plainInputClass}
                     value={form.roast_level}
                     onChange={(e) => change("roast_level", e.target.value)}
                   />
-                  <datalist id="roasts">
-                    <option>Light</option>
-                    <option>Medium-Light</option>
-                    <option>Medium</option>
-                    <option>Medium-Dark</option>
-                    <option>Dark</option>
-                  </datalist>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="roast-date">Roast date</FieldLabel>
+                  <ChipRow
+                    options={ROAST_LEVELS}
+                    value={form.roast_level}
+                    onSelect={(value) => change("roast_level", value)}
+                  />
+                </PlainField>
+                <PlainField label="Roast date" htmlFor="roast-date">
                   <Input
                     id="roast-date"
                     type="date"
+                    className={plainInputClass}
                     value={form.roast_date}
                     onChange={(e) => change("roast_date", e.target.value)}
                   />
-                </Field>
+                </PlainField>
+              </CardContent>
+            </Card>
+          </Section>
+          <Section label="Roaster's notes">
+            <Card>
+              <CardContent>
                 <TermField
                   label="Roaster notes"
                   values={roasterNotes}
@@ -485,9 +465,9 @@ export function BeanEditor({ id }: { id?: string }) {
                   onAdd={addRoasterNote}
                   onRemove={removeRoasterNote}
                 />
-              </FieldGroup>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Section>
           <div className="sticky bottom-0 flex gap-3 border-t bg-background/95 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur">
             <Button
               type="button"
@@ -506,6 +486,83 @@ export function BeanEditor({ id }: { id?: string }) {
     </EditorFrame>
   );
 }
+/// A small caps section label above a continuous card of plain rows, mirroring the native app's
+/// BEAN/ORIGIN/ROAST/ROASTER'S NOTES section headers instead of a Card with its own bordered
+/// title + description.
+function Section({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="overline px-1">{label}</p>
+      {children}
+    </div>
+  );
+}
+/// One borderless row — a small caps caption above a plain-text value, divided from its
+/// neighbors by the card's own hairline — matching iOS's continuous card of fields instead of a
+/// form of individually bordered inputs.
+function PlainField({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 py-3">
+      <label htmlFor={htmlFor} className="overline">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+const plainInputClass =
+  "h-auto border-0 bg-transparent p-0 text-base shadow-none outline-none focus-visible:ring-0 dark:bg-transparent";
+/// Tappable quick-pick chips that wrap onto additional lines instead of overflowing the card —
+/// the same pattern the grinder picker uses — with a checkmark on the selected value. Tapping the
+/// active chip clears it, since these are optional shortcuts for the free-text field above.
+function ChipRow({
+  options,
+  value,
+  onSelect,
+}: {
+  options: string[];
+  value: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2 pt-1">
+      {options.map((option) => {
+        const active = value === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onSelect(active ? "" : option)}
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors",
+              active
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-input bg-transparent text-muted-foreground hover:bg-muted",
+            )}
+            aria-pressed={active}
+          >
+            {active && <Check className="size-3.5" aria-hidden />}
+            {option}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 function EditorFrame({
   title,
   children,
@@ -514,7 +571,7 @@ function EditorFrame({
   children: React.ReactNode;
 }) {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-5 w-[calc(100%-var(--spacing)*10)]">
+    <main className="mx-auto w-full max-w-2xl px-4 py-5">
       <Button variant="ghost" onClick={() => history.back()}>
         <ArrowLeft data-icon="inline-start" />
         Back

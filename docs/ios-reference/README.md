@@ -60,6 +60,15 @@ fresh visual gap worth keeping around.
   anywhere in Edit Bean — roaster notes is the only editable tasting-note surface on a bean.
   `web/src/components/bean-editor.tsx` matches this now (`TermField` for roaster notes, the
   unused flavor-tags field removed).
+- **Edit Bean is a continuous card of plain rows per section (BEAN/ORIGIN/ROAST/ROASTER'S
+  NOTES), not a form of individually bordered inputs.** Country/Region/Farm/Varietal are stacked
+  full-width rows in one card, not a 2-column grid — the same "squished" complaint and fix as the
+  Recipe tab (see above). Process and Roast level are wrapping quick-pick chips (`ChipRow`, the
+  same pattern as the grinder picker's chips) below a free-text field, not a `ToggleGroup` — the
+  old fixed-width, non-wrapping `ToggleGroup` row let its last chip ("Anaerobic") overflow off the
+  edge of the screen instead of wrapping to a new line. `bean-editor.tsx` matches this now
+  (`Section`/`PlainField`/`ChipRow`); `EditorFrame`'s page container also dropped a redundant
+  `w-[calc(100%-var(--spacing)*10)]` that was double-shrinking the content width on top of `px-4`.
 
 ## Adding more
 
