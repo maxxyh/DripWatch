@@ -90,6 +90,7 @@ work, also verify against the real Supabase project and run security/performance
 
 ## Topic library
 
+- [iOS reference screenshots for PWA parity work](docs/ios-reference/README.md)
 - [Supabase sync architecture and operations](docs/supabase-sync.md)
 - [Engineering process and session learnings](docs/engineering-process.md)
 - [Web PWA setup, deployment, security, and offline behavior](docs/web-pwa.md)
