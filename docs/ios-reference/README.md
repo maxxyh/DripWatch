@@ -3,9 +3,13 @@
 Real screenshots of the native app (dark mode, iPhone), captured 2026-08-19, for comparing the
 web PWA's visual density and typography against iOS — not just its source. Reading
 `RecipeEditor.swift` tells you *what fields exist*; these tell you *how little chrome iOS puts
-around them*. Check this folder before reworking any PWA screen that has a native counterpart,
-and add to it (compressed, as below) whenever a redesign turns up a fresh visual gap worth
-keeping around.
+around them*. Source-reading alone can also get *where* a field appears wrong: a view like
+`BeanCardView` branches by `style` (`.shelf` vs `.full`), so a field read off the wrong branch
+gets built as a PWA feature iOS never shows anywhere — that's exactly how the PWA grew a
+`my_flavor_tags` shelf chip and edit-bean field with no real iOS counterpart, later removed once
+real screenshots (and the user) caught it. Check this folder before reworking any PWA screen that
+has a native counterpart, and add to it (compressed, as below) whenever a redesign turns up a
+fresh visual gap worth keeping around.
 
 | File | Screen |
 | --- | --- |

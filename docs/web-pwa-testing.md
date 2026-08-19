@@ -58,6 +58,39 @@ npx playwright install chromium webkit
 npm run test:e2e
 ```
 
+## Live-verifying UI changes without real network access
+
+If direct HTTPS to Supabase is blocked (a sandboxed agent environment will 403 at the network
+layer before any app code runs), don't skip live verification — drive the running dev server with
+Playwright against mocked data instead of just reading the diff:
+
+```js
+const browser = await chromium.launch(); // add executablePath if the sandbox needs a pinned binary
+const page = await browser.newPage();
+
+// The app gates every route behind DRIPWATCH_PASSCODE; there's no bypass, so log in for real.
+await page.goto("http://localhost:3000/login");
+await page.fill('input[type="password"]', process.env.DRIPWATCH_PASSCODE);
+await page.click('button[type="submit"]');
+await page.waitForTimeout(1500); // the redirect after login isn't awaited by networkidle
+
+// Mock /api/notebook for both shapes: GET returns the whole Notebook, POST is client-mutations.ts's
+// mutate() call ({table, row, originalUpdatedAt}) and expects {row: <saved row>} back.
+await page.route("**/api/notebook", async (route) => {
+  const req = route.request();
+  if (req.method() === "GET")
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(notebook) });
+  const body = req.postDataJSON();
+  route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ row: body.row }) });
+});
+```
+
+From there, assert on real DOM (text content, input values, bounding boxes) and drive real
+interactions (typing, Enter, clicks) rather than trusting that code compiling means the feature
+works. This caught real bugs this way: a click target visually smaller than its hit-testable box
+(photo viewer tap-to-dismiss), and a save handler that would have silently dropped an unrelated
+field's existing value.
+
 ## Manual verification
 
 With disposable test data and real environment values, also verify two-session stale conflicts,

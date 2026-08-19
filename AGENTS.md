@@ -81,6 +81,10 @@ work, also verify against the real Supabase project and run security/performance
 - Every user mutation of a syncable model must call `markDirty()`; deletes use `softDelete()`.
 - Never hard-delete synced records or expose a service-role/secret key in the app.
 - Reuse `RecipeEditor`; do not fork a second recipe-editing interface.
+- Don't add a field, editor, or display surface to the web PWA that iOS doesn't have. Verify
+  against `docs/ios-reference/` (or the exact source branch, e.g. a view's `style` parameter)
+  rather than skimming Swift source — a PWA-only surface is how user data gets silently misfiled
+  with no iOS counterpart to catch it (see the `my_flavor_tags` removal in `docs/ios-reference/`).
 - Always display full `GrindSetting.display`; deltas never replace the absolute setting.
 - New recipe parameters are optional. Put everyday values in the simple line and specialist
   values behind progressive disclosure.
