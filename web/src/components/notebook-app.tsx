@@ -34,6 +34,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ThemeSelect } from "@/components/theme-select";
 import type { BeanRow, Notebook } from "@/lib/domain";
 import { photoUrl } from "@/lib/domain";
 
@@ -213,6 +214,7 @@ function Header({
           >
             <RefreshCw />
           </Button>
+          <ThemeSelect />
           <Button
             variant="ghost"
             size="icon"
