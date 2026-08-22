@@ -127,7 +127,7 @@ struct BeanCardView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Theme.accent)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .fixedSize(horizontal: true, vertical: false)
                         .accessibilityLabel("\(price.formatted(.number.precision(.fractionLength(2)))) Singapore dollars per gram")
                 }
                 // Roaster's tasting notes on the shelf — the enticement to pick this bag.
