@@ -20,6 +20,10 @@ import {
 } from "@/lib/domain";
 const PROCESSES = ["Washed", "Natural", "Honey", "Anaerobic"];
 const ROAST_LEVELS = ["Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"];
+const positiveNumber = (value: string) => {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+};
 const blank = {
   name: "",
   roaster_name: "",
@@ -30,6 +34,8 @@ const blank = {
   process: "",
   roast_level: "",
   roast_date: "",
+  price_sgd: "",
+  bag_size_grams: "",
 };
 type Form = typeof blank;
 type PhotoDraft =
@@ -87,6 +93,8 @@ export function BeanEditor({ id }: { id?: string }) {
           process: b.process ?? "",
           roast_level: b.roast_level ?? "",
           roast_date: b.roast_date?.slice(0, 10) ?? "",
+          price_sgd: b.price_sgd?.toString() ?? "",
+          bag_size_grams: b.bag_size_grams?.toString() ?? "",
         });
         setRoasterNotes(
           b.roaster_notes ? normalizeTerms(b.roaster_notes.split(",")) : [],
@@ -136,6 +144,8 @@ export function BeanEditor({ id }: { id?: string }) {
             ? new Date(`${form.roast_date}T12:00:00Z`).toISOString()
             : null,
           roaster_notes: roasterNotes.length ? roasterNotes.join(", ") : null,
+          price_sgd: positiveNumber(form.price_sgd),
+          bag_size_grams: positiveNumber(form.bag_size_grams),
           my_flavor_tags: row?.my_flavor_tags ?? [],
           finished_at: row?.finished_at ?? null,
           pending_next_pourover: row?.pending_next_pourover ?? null,
@@ -410,6 +420,38 @@ export function BeanEditor({ id }: { id?: string }) {
                     />
                   </PlainField>
                 ))}
+              </CardContent>
+            </Card>
+          </Section>
+          <Section label="Purchase">
+            <Card>
+              <CardContent className="divide-y divide-border py-0">
+                <PlainField label="Price (SGD)" htmlFor="price-sgd">
+                  <Input
+                    id="price-sgd"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    className={plainInputClass}
+                    value={form.price_sgd}
+                    onChange={(e) => change("price_sgd", e.target.value)}
+                    placeholder="32.00"
+                  />
+                </PlainField>
+                <PlainField label="Bag size (g)" htmlFor="bag-size-grams">
+                  <Input
+                    id="bag-size-grams"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.1"
+                    className={plainInputClass}
+                    value={form.bag_size_grams}
+                    onChange={(e) => change("bag_size_grams", e.target.value)}
+                    placeholder="250"
+                  />
+                </PlainField>
               </CardContent>
             </Card>
           </Section>

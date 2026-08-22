@@ -46,6 +46,8 @@ struct AddBeanView: View {
     @State private var roastLevel: String
     @State private var hasRoastDate: Bool
     @State private var roastDate: Date
+    @State private var priceSGD: String
+    @State private var bagSizeGrams: String
     /// Roaster's tasting notes as chips (stored comma-joined on the bean).
     @State private var roasterNoteTags: [String]
 
@@ -65,6 +67,8 @@ struct AddBeanView: View {
         // Default roast date ON for new beans (we only buy dated bags); reflect reality when editing.
         _hasRoastDate = State(initialValue: bean == nil ? true : (bean?.roastDate != nil))
         _roastDate = State(initialValue: bean?.roastDate ?? .now)
+        _priceSGD = State(initialValue: bean?.priceSGD.map(Self.editableNumber) ?? "")
+        _bagSizeGrams = State(initialValue: bean?.bagSizeGrams.map(Self.editableNumber) ?? "")
         _roasterNoteTags = State(initialValue: bean?.roasterNoteList ?? [])
 
         // Load existing gallery (by identity so unchanged photos aren't re-inserted), falling
@@ -89,6 +93,10 @@ struct AddBeanView: View {
                 Section("Bean") {
                     LabeledTextField(label: "Name", placeholder: "e.g. Pure Forest", text: $name)
                     LabeledTextField(label: "Roaster", placeholder: "e.g. Nylon", text: $roaster)
+                }
+                Section("Purchase") {
+                    LabeledNumericField(label: "Price (SGD)", placeholder: "e.g. 32.00", text: $priceSGD)
+                    LabeledNumericField(label: "Bag size (g)", placeholder: "e.g. 250", text: $bagSizeGrams)
                 }
                 unresolvedSection
                 Section("Origin") {
@@ -422,11 +430,22 @@ struct AddBeanView: View {
         bean.roastLevel = roastLevel.nilIfBlank?.normalizedTerm
         bean.roastDate = hasRoastDate ? roastDate : nil
         bean.roasterNotes = roasterNoteTags.isEmpty ? nil : roasterNoteTags.normalizedTerms.joined(separator: ", ")
+        bean.priceSGD = positiveNumber(priceSGD)
+        bean.bagSizeGrams = positiveNumber(bagSizeGrams)
         if editingBean == nil { context.insert(bean) }
         applyPhotos(to: bean)
         bean.markDirty()
         Haptics.success()
         dismiss()
+    }
+
+    private static func editableNumber(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0...2)))
+    }
+
+    private func positiveNumber(_ text: String) -> Double? {
+        let value = Double(text.replacingOccurrences(of: ",", with: "."))
+        return value.flatMap { $0 > 0 && $0.isFinite ? $0 : nil }
     }
 
     /// Reconcile the edited gallery onto the bean: soft-delete removed photos, reorder kept ones,
@@ -471,6 +490,21 @@ private struct LabeledTextField: View {
                 .textInputAutocapitalization(.words)
         }
         .padding(.vertical, 2)
+    }
+}
+
+private struct LabeledNumericField: View {
+    let label: String
+    let placeholder: String
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label).overline()
+            TextField(placeholder, text: $text)
+                .keyboardType(.decimalPad)
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 

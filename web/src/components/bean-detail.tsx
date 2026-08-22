@@ -506,9 +506,16 @@ function CharacterCard({
         <p className="overline">
           {bean.roaster_name || "Coffee character card"}
         </p>
-        <CardTitle className="text-3xl">
-          {bean.name || "Untitled bean"}
-        </CardTitle>
+        <div className="flex items-baseline justify-between gap-3">
+          <CardTitle className="text-3xl">
+            {bean.name || "Untitled bean"}
+          </CardTitle>
+          {bean.price_sgd && bean.bag_size_grams && (
+            <span className="shrink-0 text-sm font-semibold text-primary">
+              S${(bean.price_sgd / bean.bag_size_grams).toFixed(2)}/g
+            </span>
+          )}
+        </div>
         <CardDescription>
           {[bean.region, bean.country].filter(Boolean).join(", ")}
         </CardDescription>
@@ -552,6 +559,8 @@ function CharacterCard({
                 : null,
             ],
             ["Farm", bean.farm],
+            ["Price", bean.price_sgd ? `S$${bean.price_sgd.toFixed(2)}` : null],
+            ["Bag size", bean.bag_size_grams ? `${bean.bag_size_grams} g` : null],
           ]
             .filter((x) => x[1])
             .map(([k, v]) => (

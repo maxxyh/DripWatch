@@ -28,6 +28,10 @@ create table if not exists public.beans (
     roast_level text,
     roast_date timestamptz,
     roaster_notes text,
+    price_sgd double precision
+        constraint beans_price_sgd_positive check (price_sgd is null or price_sgd > 0),
+    bag_size_grams double precision
+        constraint beans_bag_size_grams_positive check (bag_size_grams is null or bag_size_grams > 0),
     my_flavor_tags text[] not null default '{}'::text[]
         constraint beans_my_flavor_tags_no_nulls
         check (array_position(my_flavor_tags, null::text) is null),

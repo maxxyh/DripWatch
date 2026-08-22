@@ -47,6 +47,8 @@ struct SupabaseDTOTests {
         bean.roastLevel = "Light"
         bean.roastDate = roastDate
         bean.roasterNotes = "peach, jasmine"
+        bean.priceSGD = 36.50
+        bean.bagSizeGrams = 250
         bean.myFlavorTags = ["stone fruit", "floral"]
         bean.finishedAt = Date(timeIntervalSince1970: 1_700_000_300)
         bean.pendingNextPourover = recipe.asPlanSeed
@@ -89,6 +91,8 @@ struct SupabaseDTOTests {
         #expect(beanDTO.makeModel().name == bean.name)
         #expect(beanDTO.makeModel().roastDate == bean.roastDate)
         #expect(beanDTO.makeModel().pendingNextPourover == bean.pendingNextPourover)
+        #expect(beanDTO.makeModel().priceSGD == 36.50)
+        #expect(beanDTO.makeModel().bagSizeGrams == 250)
 
         let brewDTO = try roundTrip(BrewDTO(brew, photoPath: "brews/brew/result.jpg"), encoder: encoder, decoder: decoder)
         let restoredBrew = brewDTO.makeModel()
@@ -171,7 +175,7 @@ struct SupabaseDTOTests {
         bean.pendingNextEspresso = nil
         bean.finishedAt = nil
         let beanObject = try JSONSerialization.jsonObject(with: encoder.encode(BeanDTO(bean))) as! [String: Any]
-        for key in ["pending_next_pourover", "pending_next_espresso", "finished_at"] {
+        for key in ["pending_next_pourover", "pending_next_espresso", "finished_at", "price_sgd", "bag_size_grams"] {
             #expect(beanObject.keys.contains(key), "\(key) must be present so PostgREST clears it")
             #expect(beanObject[key] is NSNull)
         }

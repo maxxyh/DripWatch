@@ -93,10 +93,20 @@ struct BeanCardView: View {
 
     private var info: some View {
         VStack(alignment: .leading, spacing: style == .full ? 12 : 6) {
-            Text(bean.name.isEmpty ? "Untitled bean" : bean.name)
-                .font(style == .full ? .title2.bold() : .headline)
-                .foregroundStyle(Color(.label))
-                .lineLimit(style == .full ? 2 : 1)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(bean.name.isEmpty ? "Untitled bean" : bean.name)
+                    .font(style == .full ? .title2.bold() : .headline)
+                    .foregroundStyle(Color(.label))
+                    .lineLimit(style == .full ? 2 : 1)
+                Spacer(minLength: 0)
+                if style == .full, let price = bean.pricePerGramSGD {
+                    Text("S$\(price.formatted(.number.precision(.fractionLength(2))))/g")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                        .fixedSize()
+                        .accessibilityLabel("\(price.formatted(.number.precision(.fractionLength(2)))) Singapore dollars per gram")
+                }
+            }
 
             if let roaster = bean.roasterName, !roaster.isEmpty {
                 Text(roaster.uppercased())
@@ -182,6 +192,8 @@ struct BeanCardView: View {
             fact("PROCESS", bean.process)
             fact("ROAST", bean.roastLevel)
             if let d = bean.roastDate { fact("ROASTED", roastedText(d)) }
+            if let price = bean.priceSGD { fact("PRICE", "S$\(price.formatted(.number.precision(.fractionLength(2))))") }
+            if let grams = bean.bagSizeGrams { fact("BAG SIZE", "\(grams.formatted(.number.precision(.fractionLength(0...1)))) g") }
         }
     }
 

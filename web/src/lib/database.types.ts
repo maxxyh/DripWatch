@@ -70,6 +70,8 @@ export type Database = {
           roast_level: string | null;
           roaster_name: string | null;
           roaster_notes: string | null;
+          price_sgd: number | null;
+          bag_size_grams: number | null;
           updated_at: string;
           varietal: string | null;
         };
@@ -90,6 +92,8 @@ export type Database = {
           roast_level?: string | null;
           roaster_name?: string | null;
           roaster_notes?: string | null;
+          price_sgd?: number | null;
+          bag_size_grams?: number | null;
           updated_at?: string;
           varietal?: string | null;
         };
@@ -110,6 +114,8 @@ export type Database = {
           roast_level?: string | null;
           roaster_name?: string | null;
           roaster_notes?: string | null;
+          price_sgd?: number | null;
+          bag_size_grams?: number | null;
           updated_at?: string;
           varietal?: string | null;
         };
