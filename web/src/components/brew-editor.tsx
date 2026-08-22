@@ -62,17 +62,21 @@ export function BrewEditor({
   beanId,
   brewId,
   initialMethod = "pourover",
+  initialPhase = "recipe",
 }: {
   beanId?: string;
   brewId?: string;
   initialMethod?: Method;
+  initialPhase?: "recipe" | "taste";
 }) {
   const router = useRouter();
   const [book, setBook] = useState<Notebook | null>(null),
     [bean, setBean] = useState<BeanRow | null>(null),
     [existing, setExisting] = useState<BrewRow | null>(null),
     [method, setMethod] = useState<Method>(initialMethod),
-    [phase, setPhase] = useState("recipe"),
+    [phase, setPhase] = useState<"recipe" | "brewing" | "taste">(
+      initialPhase,
+    ),
     [recipe, setRecipe] = useState<Recipe>(emptyRecipe()),
     [taste, setTaste] = useState<Taste>(emptyTaste()),
     [plan, setPlan] = useState(false),

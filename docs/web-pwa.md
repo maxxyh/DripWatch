@@ -84,6 +84,12 @@ recoverable but not transactionally atomic through PostgREST. Bean and brew phot
 in the browser and guarded by canonical, record-linked proxy paths. Replacement objects may remain
 orphaned after a later stale-write conflict and must not be deleted speculatively.
 
+When no plan exists, bean detail keeps a quiet “Next brew / Plan a change” entry below the brew
+buttons; it opens the existing full recipe planner, seeded from the newest brew (or the default
+pourover recipe when history is empty). The newest history card alone shows a dashed “Add tasting
+notes?” suggestion when its taste is completely empty, linking directly to that brew's Taste tab.
+Older untasted brews are intentionally left unprompted.
+
 Once a brew is started, its date, recipe, observed time, taste, and photo reference autosave with
 stale-write guards. Planning from the newest brew updates the bean's single active pending plan;
 the legacy per-brew `next_recipe_draft` field is no longer used by the PWA. Brewing mode retains

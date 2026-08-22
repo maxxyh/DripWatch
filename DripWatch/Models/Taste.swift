@@ -27,6 +27,6 @@ struct Taste: Codable, Hashable {
 
     var isEmpty: Bool {
         positives.isEmpty && negatives.isEmpty && balance.isEmpty && rating == nil
-            && (note?.isEmpty ?? true)
+            && (note?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
     }
 }

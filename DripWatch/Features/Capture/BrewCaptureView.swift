@@ -46,10 +46,14 @@ struct BrewCaptureView: View {
     @State private var showCamera = false
     @State private var preview: PreviewPhoto?
 
-    init(bean: Bean, method: BrewMethod = .pourover, editing: Brew? = nil) {
+    init(bean: Bean,
+         method: BrewMethod = .pourover,
+         editing: Brew? = nil,
+         initialPhase: Phase = .recipe) {
         self.bean = bean
         self.method = editing?.method ?? method
         self.editingBrew = editing
+        _phase = State(initialValue: initialPhase)
 
         if let editing {
             // Editing: load exactly what was saved so nothing changes unless the user changes it.

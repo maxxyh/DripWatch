@@ -9,8 +9,10 @@ import {
   ArrowLeft,
   Coffee,
   Copy,
+  CornerDownRight,
   Ellipsis,
   ImageIcon,
+  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-react";
@@ -45,8 +47,12 @@ import {
 } from "@/components/ui/empty";
 import type { BeanRow, BrewRow, Notebook, Recipe } from "@/lib/domain";
 import {
+  asPlanSeed,
   brewDiff,
   brewMarkdown,
+  emptyRecipe,
+  hasTaste,
+  newPourover,
   photoUrl,
   singlePendingPlanPatch,
 } from "@/lib/domain";
@@ -265,6 +271,15 @@ export default function BeanDetail({
               Espresso
             </Link>
           </div>
+          {!pendingPlan && (
+            <PlanPrompt
+              bean={bean}
+              latest={brews[0]}
+              data={data}
+              offline={offline}
+              refresh={refresh}
+            />
+          )}
         </section>
         <section>
           <div className="mb-4 flex items-baseline justify-between">
@@ -300,6 +315,7 @@ export default function BeanDetail({
                       bean={bean}
                       previous={brews[i + 1]}
                       plannedNext={plannedNext}
+                      showTastePrompt={i === 0 && !hasTaste(b.taste)}
                       offline={offline}
                       refresh={refresh}
                     />
@@ -323,6 +339,132 @@ export default function BeanDetail({
         </section>
       </div>
     </main>
+  );
+}
+function PlanPrompt({
+  bean,
+  latest,
+  data,
+  offline,
+  refresh,
+}: {
+  bean: BeanRow;
+  latest?: BrewRow;
+  data: Notebook;
+  offline: boolean;
+  refresh: () => Promise<void>;
+}) {
+  const router = useRouter();
+  const method = latest?.method_raw ?? "pourover";
+  const seed = latest
+    ? asPlanSeed(latest.recipe)
+    : method === "pourover"
+      ? newPourover()
+      : emptyRecipe();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(seed);
+  const [working, setWorking] = useState(false);
+  const [changed, setChanged] = useState(false);
+  const beanToken = useRef(bean.updated_at);
+  const planQueue = useRef<Promise<unknown>>(Promise.resolve());
+
+  useEffect(() => {
+    beanToken.current = bean.updated_at;
+  }, [bean.updated_at]);
+
+  const queuePersist = useCallback(
+    (value: Recipe) => {
+      const job = planQueue.current.then(async () => {
+        const updated = (await mutate(
+          "beans",
+          { id: bean.id, ...singlePendingPlanPatch(method, value) },
+          beanToken.current,
+        )) as BeanRow;
+        beanToken.current = updated.updated_at;
+        return updated;
+      });
+      planQueue.current = job.catch(() => undefined);
+      return job;
+    },
+    [bean.id, method],
+  );
+
+  useEffect(() => {
+    if (!editing || !changed || offline) return;
+    const timeout = setTimeout(() => {
+      queuePersist(draft).catch((error) =>
+        toast.error(
+          error instanceof Error ? error.message : "Plan autosave failed",
+        ),
+      );
+    }, 700);
+    return () => clearTimeout(timeout);
+  }, [changed, draft, editing, offline, queuePersist]);
+
+  async function save() {
+    setWorking(true);
+    try {
+      await queuePersist(draft);
+      toast.success("Next-brew plan saved");
+      setEditing(false);
+      await refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save plan",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function brewDraftNow() {
+    setWorking(true);
+    try {
+      await queuePersist(draft);
+      router.push(`/beans/${bean.id}/brews/new?method=${method}`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not start plan",
+      );
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <button
+        type="button"
+        className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-4 py-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+        disabled={offline || working}
+        aria-expanded={editing}
+        onClick={() => {
+          setDraft(seed);
+          setChanged(false);
+          setEditing((value) => !value);
+        }}
+      >
+        <CornerDownRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="flex flex-col">
+          <span className="text-sm font-medium">Next brew</span>
+          <span className="text-xs text-muted-foreground">Plan a change</span>
+        </span>
+      </button>
+      {editing && (
+        <PlanEditor
+          draft={draft}
+          onChange={(value) => {
+            setDraft(value);
+            setChanged(true);
+          }}
+          method={method}
+          data={data}
+          working={working}
+          offline={offline}
+          onSave={save}
+          onBrew={brewDraftNow}
+        />
+      )}
+    </div>
   );
 }
 function CharacterCard({
@@ -557,32 +699,60 @@ function PlanCard({
           nesting it inside CardContent here would double the horizontal padding around every
           field (see the identical fix in brew-editor.tsx's "Plan the next brew" section). */}
       {editing && (
-        <div className="flex flex-col gap-3">
-          <RecipeEditor
-            recipe={draft}
-            onChange={setDraft}
-            method={method}
-            grinders={data.grinders.filter((grinder) => !grinder.deleted_at)}
-          />
-          <div className="flex gap-2">
-            <Button
-              className="flex-1"
-              disabled={working}
-              onClick={() => persist(draft)}
-            >
-              Save plan
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              disabled={working || offline}
-              onClick={brewDraftNow}
-            >
-              Brew this now
-            </Button>
-          </div>
-        </div>
+        <PlanEditor
+          draft={draft}
+          onChange={setDraft}
+          method={method}
+          data={data}
+          working={working}
+          offline={offline}
+          onSave={() => persist(draft)}
+          onBrew={brewDraftNow}
+        />
       )}
+    </div>
+  );
+}
+function PlanEditor({
+  draft,
+  onChange,
+  method,
+  data,
+  working,
+  offline,
+  onSave,
+  onBrew,
+}: {
+  draft: Recipe;
+  onChange: (recipe: Recipe) => void;
+  method: "pourover" | "espresso";
+  data: Notebook;
+  working: boolean;
+  offline: boolean;
+  onSave: () => void;
+  onBrew: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <RecipeEditor
+        recipe={draft}
+        onChange={onChange}
+        method={method}
+        grinders={data.grinders.filter((grinder) => !grinder.deleted_at)}
+      />
+      <div className="flex gap-2">
+        <Button className="flex-1" disabled={working} onClick={onSave}>
+          Save plan
+        </Button>
+        <Button
+          variant="outline"
+          className="flex-1"
+          disabled={working || offline}
+          onClick={onBrew}
+        >
+          Brew this now
+        </Button>
+      </div>
     </div>
   );
 }
@@ -591,6 +761,7 @@ function HistoryCard({
   bean,
   previous,
   plannedNext,
+  showTastePrompt,
   offline,
   refresh,
 }: {
@@ -598,6 +769,7 @@ function HistoryCard({
   bean: BeanRow;
   previous?: BrewRow;
   plannedNext?: Recipe | null;
+  showTastePrompt: boolean;
   offline: boolean;
   refresh: () => Promise<void>;
 }) {
@@ -732,6 +904,24 @@ function HistoryCard({
       />
         <RecipeReadout recipe={brew.recipe} />
         <ChangeChips changes={changes} />
+        {showTastePrompt && (
+          <Link
+            href={`/brews/${brew.id}/edit?phase=taste`}
+            aria-disabled={offline || working}
+            tabIndex={offline || working ? -1 : undefined}
+            onClick={(event) => {
+              if (offline || working) event.preventDefault();
+            }}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "min-h-11 w-fit rounded-full border-primary/40 px-3 text-primary [border-style:dashed]",
+              (offline || working) && "pointer-events-none opacity-50",
+            )}
+          >
+            <SlidersHorizontal aria-hidden />
+            Add tasting notes?
+          </Link>
+        )}
         <div className="flex flex-wrap gap-1">
           {brew.taste.positives.map((x) => (
             <Badge key={`+${x}`} variant="outline" className="text-positive">

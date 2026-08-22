@@ -10,6 +10,7 @@ struct BeanDetailView: View {
 
     @State private var captureMethod: BrewMethod?
     @State private var editingBrew: Brew?
+    @State private var editingBrewForTaste: Brew?
     @State private var editingPlan: BrewMethod?
     /// Set when the plan editor asks to start a brew; launched after that sheet dismisses so we
     /// never present two sheets at once.
@@ -35,6 +36,10 @@ struct BeanDetailView: View {
 
                 brewButtons
 
+                if bean.pendingNextPourover == nil, bean.pendingNextEspresso == nil {
+                    emptyNextPlan
+                }
+
                 if bean.timeline.isEmpty {
                     emptyHistory
                 } else {
@@ -47,6 +52,7 @@ struct BeanDetailView: View {
                     .id("history")
                     BrewHistoryView(brews: bean.timeline,
                                     onEdit: { editingBrew = $0 },
+                                    onAddTaste: { editingBrewForTaste = $0 },
                                     onDelete: delete,
                                     onTapPhoto: { preview = PreviewPhoto(data: $0) })
                 }
@@ -94,6 +100,9 @@ struct BeanDetailView: View {
         }
         .sheet(item: $editingBrew) { brew in
             BrewCaptureView(bean: bean, editing: brew)
+        }
+        .sheet(item: $editingBrewForTaste) { brew in
+            BrewCaptureView(bean: bean, editing: brew, initialPhase: .taste)
         }
         .sheet(item: $editingPlan, onDismiss: {
             if let method = pendingBrewMethod { pendingBrewMethod = nil; captureMethod = method }
@@ -185,6 +194,39 @@ struct BeanDetailView: View {
             .controlSize(.large)
             .tint(.secondary)
         }
+    }
+
+    private var emptyNextPlan: some View {
+        Button {
+            Haptics.tap()
+            editingPlan = bean.lastBrew?.method ?? .pourover
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.turn.down.right")
+                    .foregroundStyle(Theme.accent.opacity(0.8))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Next brew")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color(.label))
+                    Text("Plan a change")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, Theme.Space.m)
+            .padding(.vertical, 6)
+            .background(Theme.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Next brew, plan a change")
+        .accessibilityHint("Opens the next brew plan")
     }
 
     private var emptyHistory: some View {

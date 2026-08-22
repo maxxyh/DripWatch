@@ -4,6 +4,7 @@ import {
   brewDiff,
   effectiveWater,
   grindDisplay,
+  hasTaste,
   newPourover,
   normalizeTerm,
   normalizeTerms,
@@ -61,6 +62,33 @@ describe("Swift recipe parity", () => {
       totalDrawdownSec: undefined,
       doseGrams: 18,
     }));
+});
+
+describe("hasTaste", () => {
+  it("treats the untouched taste shape as empty", () => {
+    expect(hasTaste({ positives: [], negatives: [], balance: {} })).toBe(false);
+  });
+
+  it("recognizes each persisted kind of tasting input", () => {
+    expect(
+      hasTaste({ positives: ["Sweet"], negatives: [], balance: {} }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: ["Dry"], balance: {} }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: [], balance: { body: 3 } }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: [], balance: {}, rating: 4 }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: [], balance: {}, note: "Juicy" }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: [], balance: {}, note: "   " }),
+    ).toBe(false);
+  });
 });
 describe("instrument formatting and diffs", () => {
   it("shows absolute signed grind", () =>

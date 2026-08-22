@@ -39,6 +39,12 @@ export const emptyTaste = (): Taste => ({
   negatives: [],
   balance: {},
 });
+export const hasTaste = (taste: Taste) =>
+  taste.positives.length > 0 ||
+  taste.negatives.length > 0 ||
+  Object.keys(taste.balance).length > 0 ||
+  taste.rating !== undefined ||
+  !!taste.note?.trim();
 export const asPlanSeed = (recipe: Recipe): Recipe => ({
   ...recipe,
   shotTimeSec: undefined,
