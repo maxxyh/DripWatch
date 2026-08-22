@@ -575,13 +575,13 @@ export function BrewEditor({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-between">
-              <output
-                aria-label="Elapsed brew time"
-                className="font-mono text-5xl tabular-nums"
-              >
-                {Math.floor(elapsed / 60)}:
-                {String(Math.floor(elapsed % 60)).padStart(2, "0")}
-              </output>
+              <TimeInput
+                id="observed-time"
+                aria-label={method === "pourover" ? "Drawdown time" : "Shot time"}
+                seconds={Math.round(elapsed)}
+                onChange={(seconds) => setElapsed(seconds ?? 0)}
+                className="h-auto w-40 rounded-none border-0 bg-transparent px-0 font-mono text-5xl tabular-nums shadow-none focus-visible:ring-0 md:text-5xl dark:bg-transparent"
+              />
               <Button size="lg" onClick={() => setRunning((x) => !x)}>
                 {running ? (
                   <Pause data-icon="inline-start" />
@@ -591,21 +591,8 @@ export function BrewEditor({
                 {running ? "Pause" : "Start"}
               </Button>
             </CardContent>
-            <CardContent className="grid grid-cols-2 gap-3 border-t pt-4">
-              <Field>
-                <FieldLabel htmlFor="observed-time">
-                  {method === "pourover" ? "Drawdown time" : "Shot time"}
-                </FieldLabel>
-                <TimeInput
-                  id="observed-time"
-                  seconds={Math.round(elapsed) || undefined}
-                  onChange={(seconds) => setElapsed(seconds ?? 0)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Type 230 for 2:30.
-                </p>
-              </Field>
-              {method === "espresso" && (
+            {method === "espresso" && (
+              <CardContent className="border-t pt-4">
                 <Field>
                   <FieldLabel htmlFor="live-yield">Yield (g)</FieldLabel>
                   <NumericStepper
@@ -621,8 +608,8 @@ export function BrewEditor({
                     }
                   />
                 </Field>
-              )}
-            </CardContent>
+              </CardContent>
+            )}
           </Card>
         </div>
       )}

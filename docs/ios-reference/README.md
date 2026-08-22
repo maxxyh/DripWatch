@@ -53,7 +53,9 @@ fresh visual gap worth keeping around.
   pour's start/end time, and cumulative water target are similarly editable in the enlarged
   `POUR PLAN` rows. Changing final water also changes the final cumulative pour target, preserving
   the recipe invariant. `brew-editor.tsx` matches this via `BrewStatGrid`/`PourPlanList` in
-  `recipe-readout.tsx`; read-only recipe summaries elsewhere still use their existing rendering.
+  `recipe-readout.tsx`; its large stopwatch digits are also the direct typed-time field, rather
+  than duplicating the observation in a second input below. Read-only recipe summaries elsewhere
+  still use their existing rendering.
 - **Roaster's Notes is an Enter-to-add chip input**, not a comma-separated free-text field.
   `edit-bean-roaster-notes.jpg` shows existing notes (`Apricot`, `Honey`, `Apple Tart`) as pills
   with a sparkle icon, an `Add...` field with a return-arrow icon below, and a caption
