@@ -1,3 +1,5 @@
+"use client";
+
 import {
   CircleDot,
   Clock,
@@ -15,6 +17,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { TimeInput } from "@/components/time-input";
 import { cn } from "@/lib/utils";
 import type { Pour, Recipe } from "@/lib/domain";
 import {
@@ -23,6 +27,7 @@ import {
   grind,
   grindDisplay,
   ratioText,
+  setTotalWater,
   suggestedTargets,
   timeText,
 } from "@/lib/domain";
@@ -176,9 +181,11 @@ export function ChangeChips({ changes }: { changes: string[] }) {
 export function BrewStatGrid({
   recipe,
   method,
+  onChange,
 }: {
   recipe: Recipe;
   method: "pourover" | "espresso";
+  onChange?: (recipe: Recipe) => void;
 }) {
   const stats: { label: string; value: string }[] = [];
   if (recipe.waterTempC !== undefined)
@@ -205,9 +212,34 @@ export function BrewStatGrid({
     <div className="flex flex-wrap gap-x-6 gap-y-3">
       {stats.map((stat) => (
         <div key={stat.label} className="flex flex-col">
-          <span className="font-mono text-3xl font-bold tabular-nums">
-            {stat.value}
-          </span>
+          {method === "pourover" && onChange && stat.label === "temp" ? (
+            <LiveNumberInput
+              label="Temperature"
+              value={recipe.waterTempC}
+              suffix="°"
+              integer
+              onChange={(value) => onChange({ ...recipe, waterTempC: value })}
+            />
+          ) : method === "pourover" && onChange && stat.label === "water" ? (
+            <LiveNumberInput
+              label="Final water target"
+              value={effectiveWater(recipe)}
+              suffix="g"
+              onChange={(value) => {
+                const next = setTotalWater(recipe, value);
+                if (next.pours.length)
+                  next.pours[next.pours.length - 1] = {
+                    ...next.pours[next.pours.length - 1],
+                    toGrams: value,
+                  };
+                onChange(next);
+              }}
+            />
+          ) : (
+            <span className="font-mono text-3xl font-bold tabular-nums">
+              {stat.value}
+            </span>
+          )}
           <span className="text-xs text-muted-foreground">{stat.label}</span>
         </div>
       ))}
@@ -215,10 +247,50 @@ export function BrewStatGrid({
   );
 }
 
+function LiveNumberInput({
+  label,
+  value,
+  suffix,
+  integer = false,
+  onChange,
+}: {
+  label: string;
+  value?: number;
+  suffix: string;
+  integer?: boolean;
+  onChange: (value?: number) => void;
+}) {
+  return (
+    <label className="flex min-h-11 items-center rounded-lg bg-muted/40 px-1 focus-within:ring-2 focus-within:ring-ring">
+      <Input
+        type="text"
+        inputMode={integer ? "numeric" : "decimal"}
+        aria-label={label}
+        value={value ?? ""}
+        onChange={(event) => {
+          const raw = event.target.value.replace(",", ".");
+          if (raw === "") return onChange(undefined);
+          if (!/^\d+(?:\.\d*)?$/.test(raw)) return;
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) onChange(integer ? Math.round(parsed) : parsed);
+        }}
+        className="h-10 w-20 border-0 bg-transparent px-1 text-right font-mono text-3xl font-bold tabular-nums shadow-none focus-visible:ring-0"
+      />
+      <span className="font-mono text-3xl font-bold">{suffix}</span>
+    </label>
+  );
+}
+
 /// The pour plan as plain typed rows (order + optional time window, right-aligned cumulative
 /// target) — mirrors the native app's `POUR PLAN` section, not the boxed cards the PWA used to
 /// render each pour target in.
-export function PourPlanList({ recipe }: { recipe: Recipe }) {
+export function PourPlanList({
+  recipe,
+  onChange,
+}: {
+  recipe: Recipe;
+  onChange?: (recipe: Recipe) => void;
+}) {
   const savedTargets = recipe.pours.map((pour) => pour.toGrams);
   const targets =
     savedTargets.length && savedTargets.every((value) => value !== undefined)
@@ -226,7 +298,6 @@ export function PourPlanList({ recipe }: { recipe: Recipe }) {
       : suggestedTargets(recipe, recipe.pourCount ?? 0);
   if (!targets.length) return null;
   const summary = [
-    recipe.bloomTimeSec !== undefined ? `bloom ${timeText(recipe.bloomTimeSec)}` : null,
     recipe.pourCount !== undefined
       ? `${recipe.pourCount} pour${recipe.pourCount === 1 ? "" : "s"}`
       : null,
@@ -237,7 +308,7 @@ export function PourPlanList({ recipe }: { recipe: Recipe }) {
     .filter(Boolean)
     .join(" · ");
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           Pour plan
@@ -246,30 +317,105 @@ export function PourPlanList({ recipe }: { recipe: Recipe }) {
           <span className="text-xs text-muted-foreground">{summary}</span>
         )}
       </div>
+      {onChange && (
+        <div className="flex min-h-11 items-center justify-between gap-3">
+          <span className="text-sm font-medium text-muted-foreground">Bloom</span>
+          <TimeInput
+            id="live-bloom-time"
+            aria-label="Bloom time"
+            seconds={recipe.bloomTimeSec}
+            onChange={(seconds) => onChange({ ...recipe, bloomTimeSec: seconds })}
+            className="h-11 w-24 text-center text-lg font-semibold"
+            placeholder="—"
+          />
+        </div>
+      )}
       {targets.map((target, index) => {
         const pour = recipe.pours[index];
+        const updatePour = (patch: Partial<Pour>) => {
+          if (!onChange) return;
+          const pours: Pour[] = targets.map((grams, pourIndex) => {
+            const existing = recipe.pours[pourIndex];
+            return {
+              ...existing,
+              id: existing?.id ?? crypto.randomUUID(),
+              order: pourIndex + 1,
+              toGrams: existing?.toGrams ?? grams,
+            };
+          });
+          pours[index] = { ...pours[index], ...patch };
+          let next: Recipe = { ...recipe, pours };
+          if (index === pours.length - 1 && "toGrams" in patch) {
+            next = setTotalWater(next, patch.toGrams);
+            next.pours[next.pours.length - 1] = {
+              ...next.pours[next.pours.length - 1],
+              toGrams: patch.toGrams,
+            };
+          }
+          onChange(next);
+        };
         return (
           <div
             key={pour?.id ?? index}
-            className="flex items-center justify-between border-b border-border/40 py-1.5 last:border-b-0"
+            className="flex min-h-11 items-center justify-between gap-2 border-b border-border/40 py-1.5 last:border-b-0"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-1.5">
               <span className="font-mono text-sm font-bold text-primary">
                 #{index + 1}
               </span>
-              {pour?.startSec !== undefined && (
+              {onChange ? (
+                <div className="flex items-center gap-1">
+                  <TimeInput
+                    id={`live-pour-${index}-start`}
+                    aria-label={`Pour ${index + 1} start time`}
+                    seconds={pour?.startSec}
+                    onChange={(seconds) => updatePour({ startSec: seconds })}
+                    className="h-11 w-[4.5rem] px-1 text-center text-lg font-semibold"
+                    placeholder="start"
+                  />
+                  <span className="text-muted-foreground">–</span>
+                  <TimeInput
+                    id={`live-pour-${index}-end`}
+                    aria-label={`Pour ${index + 1} end time`}
+                    seconds={pour?.endSec}
+                    onChange={(seconds) => updatePour({ endSec: seconds })}
+                    className="h-11 w-[4.5rem] px-1 text-center text-lg font-semibold"
+                    placeholder="end"
+                  />
+                </div>
+              ) : pour?.startSec !== undefined ? (
                 <span className="text-xs text-muted-foreground">
                   {timeText(pour.startSec)}
                   {pour.endSec !== undefined ? `–${timeText(pour.endSec)}` : ""}
                 </span>
-              )}
+              ) : null}
               {pour?.style && (
                 <span className="text-xs text-muted-foreground">{pour.style}</span>
               )}
             </div>
-            <span className="font-mono text-base font-semibold tabular-nums">
-              {gramText(target)}g
-            </span>
+            {onChange ? (
+              <label className="flex min-h-11 shrink-0 items-center rounded-lg bg-muted/40 px-1 focus-within:ring-2 focus-within:ring-ring">
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  aria-label={`Pour ${index + 1} cumulative target`}
+                  value={target}
+                  onChange={(event) => {
+                    const raw = event.target.value.replace(",", ".");
+                    if (raw === "") return updatePour({ toGrams: undefined });
+                    if (!/^\d+(?:\.\d*)?$/.test(raw)) return;
+                    const parsed = Number(raw);
+                    if (Number.isFinite(parsed)) updatePour({ toGrams: parsed });
+                  }}
+                  className="h-10 w-16 border-0 bg-transparent px-1 text-right font-mono text-lg font-semibold tabular-nums shadow-none focus-visible:ring-0"
+                />
+                <span className="text-sm text-muted-foreground">g</span>
+              </label>
+            ) : (
+              <span className="font-mono text-base font-semibold tabular-nums">
+                {gramText(target)}g
+              </span>
+            )}
           </div>
         );
       })}

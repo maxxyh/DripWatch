@@ -350,13 +350,37 @@ struct BrewCaptureView: View {
                 Text(g.display).font(.param(.title3, weight: .semibold)).foregroundStyle(Theme.accent)
             }
 
-            if !bigStats.isEmpty {
+            if method == .pourover {
+                WrapLayout(spacing: 20, lineSpacing: 12) {
+                    LiveRecipeNumberField(
+                        label: "temp",
+                        suffix: "°",
+                        value: Binding(
+                            get: { recipe.waterTempC.map(Double.init) },
+                            set: { recipe.waterTempC = $0.map { Int($0.rounded()) } }
+                        ),
+                        allowsDecimal: false
+                    )
+                    if let d = recipe.doseGrams {
+                        LockedBrewStat(label: "dose", value: "\(gramText(d))g")
+                    }
+                    if let r = recipe.ratio {
+                        LockedBrewStat(label: "ratio", value: "1:\(ratioText(r))")
+                    }
+                    LiveRecipeNumberField(
+                        label: "water",
+                        suffix: "g",
+                        value: Binding(
+                            get: { recipe.effectiveWaterGrams },
+                            set: { setLiveTotalWater($0) }
+                        ),
+                        allowsDecimal: true
+                    )
+                }
+            } else if !bigStats.isEmpty {
                 WrapLayout(spacing: 20, lineSpacing: 12) {
                     ForEach(bigStats, id: \.label) { stat in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(stat.value).font(.param(.title, weight: .semibold))
-                            Text(stat.label).font(.caption2).foregroundStyle(.secondary)
-                        }
+                        LockedBrewStat(label: stat.label, value: stat.value)
                     }
                 }
             }
@@ -415,13 +439,21 @@ struct BrewCaptureView: View {
                     Text(pourPlanSummary).font(.caption).foregroundStyle(.secondary)
                 }
             }
+            editableBloom
             if recipe.hasPourBreakdown {
                 ForEach($recipe.pours) { $pour in
-                    pourRow(order: pour.order, grams: $pour.toGrams, start: pour.startSec, end: pour.endSec)
+                    let isLast = pour.id == recipe.pours.last?.id
+                    pourRow(order: pour.order,
+                            grams: isLast ? liveTotalWaterBinding : $pour.toGrams,
+                            start: $pour.startSec,
+                            end: $pour.endSec)
                 }
             } else {
-                ForEach(Array(derived.enumerated()), id: \.offset) { index, grams in
-                    staticPourRow(order: index + 1, grams: grams)
+                ForEach(Array(derived.indices), id: \.self) { index in
+                    pourRow(order: index + 1,
+                            grams: derivedPourGrams(index: index, targets: derived),
+                            start: derivedPourTime(index: index, targets: derived, keyPath: \.startSec),
+                            end: derivedPourTime(index: index, targets: derived, keyPath: \.endSec))
                 }
             }
         }
@@ -429,45 +461,82 @@ struct BrewCaptureView: View {
 
     private var pourPlanSummary: String {
         var parts: [String] = []
-        if let b = recipe.bloomTimeSec { parts.append("bloom \(timeText(b))") }
         if let p = recipe.pourCount { parts.append("\(p) pour\(p == 1 ? "" : "s")") }
         if let t = recipe.totalDrawdownSec { parts.append("TDD \(timeText(t))") }
         return parts.joined(separator: " · ")
     }
 
-    private func pourRow(order: Int, grams: Binding<Double?>, start: Int?, end: Int?) -> some View {
-        HStack(spacing: 10) {
-            Text("#\(order)").font(.param(.subheadline, weight: .bold))
-                .foregroundStyle(Theme.accent).frame(width: 28, alignment: .leading)
-            if let start {
-                Text(timeWindow(start, end)).font(.param(.caption)).foregroundStyle(.secondary)
+    private var liveTotalWaterBinding: Binding<Double?> {
+        Binding(get: { recipe.effectiveWaterGrams }, set: { setLiveTotalWater($0) })
+    }
+
+    private func setLiveTotalWater(_ grams: Double?) {
+        recipe.setTotalWater(grams)
+        if !recipe.pours.isEmpty { recipe.pours[recipe.pours.count - 1].toGrams = grams }
+    }
+
+    private func materializeLivePours(_ targets: [Double]) {
+        guard recipe.pours.isEmpty else { return }
+        recipe.pours = targets.enumerated().map { index, grams in
+            Pour(order: index + 1, toGrams: grams)
+        }
+    }
+
+    private func derivedPourGrams(index: Int, targets: [Double]) -> Binding<Double?> {
+        Binding(
+            get: { recipe.pours.indices.contains(index) ? recipe.pours[index].toGrams : targets[index] },
+            set: { value in
+                materializeLivePours(targets)
+                if index == recipe.pours.count - 1 { setLiveTotalWater(value) }
+                else { recipe.pours[index].toGrams = value }
             }
-            Spacer()
-            Text("→").foregroundStyle(.secondary)
-            TextField("—", value: grams, format: .number.precision(.fractionLength(0...0)))
-                .keyboardType(.numberPad).multilineTextAlignment(.trailing)
-                .font(.param(.title3, weight: .semibold)).frame(width: 66)
-            Text("g").font(.subheadline).foregroundStyle(.secondary)
+        )
+    }
+
+    private func derivedPourTime(index: Int,
+                                 targets: [Double],
+                                 keyPath: WritableKeyPath<Pour, Int?>) -> Binding<Int?> {
+        Binding(
+            get: { recipe.pours.indices.contains(index) ? recipe.pours[index][keyPath: keyPath] : nil },
+            set: { value in
+                materializeLivePours(targets)
+                recipe.pours[index][keyPath: keyPath] = value
+            }
+        )
+    }
+
+    private func pourRow(order: Int,
+                         grams: Binding<Double?>,
+                         start: Binding<Int?>,
+                         end: Binding<Int?>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text("#\(order)").font(.param(.subheadline, weight: .bold))
+                    .foregroundStyle(Theme.accent).frame(width: 28, alignment: .leading)
+                LivePourTimeField(placeholder: "start", seconds: start)
+                Text("–").foregroundStyle(.secondary)
+                LivePourTimeField(placeholder: "end", seconds: end)
+                Spacer(minLength: 4)
+                Text("→").foregroundStyle(.secondary)
+                TextField("—", value: grams, format: .number.precision(.fractionLength(0...1)))
+                    .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                    .font(.param(.title3, weight: .semibold)).frame(width: 62).frame(minHeight: 44)
+                Text("g").font(.subheadline).foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 2)
     }
 
-    private func staticPourRow(order: Int, grams: Double) -> some View {
+    private var editableBloom: some View {
         HStack(spacing: 10) {
-            Text("#\(order)").font(.param(.subheadline, weight: .bold))
-                .foregroundStyle(Theme.accent).frame(width: 28, alignment: .leading)
+            Label("Bloom", systemImage: "timer")
+                .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
             Spacer()
-            Text("→").foregroundStyle(.secondary)
-            Text(gramText(grams)).font(.param(.title3, weight: .semibold))
-            Text("g").font(.subheadline).foregroundStyle(.secondary)
+            LivePourTimeField(placeholder: "—", seconds: $recipe.bloomTimeSec)
         }
-        .padding(.vertical, 2)
+        .frame(minHeight: 44)
     }
 
-    private func timeWindow(_ start: Int, _ end: Int?) -> String {
-        if let end { return "\(timeText(start))–\(timeText(end))" }
-        return timeText(start)
-    }
 
     @ViewBuilder private var espressoTechnique: some View {
         let tech: [(String, String)] = [
@@ -726,6 +795,78 @@ struct ChipField: View {
 }
 
 // MARK: - Brewing observations
+
+/// Read-only values that are already fixed by the time water starts flowing (dose, ratio,
+/// grinder). They keep the same large console typography without implying they are controls.
+private struct LockedBrewStat: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).font(.param(.title, weight: .semibold))
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// A large but quiet live recipe field. The transparent resting state preserves the stat-grid
+/// readout; the 44pt field and faint surface communicate editability when tapped.
+private struct LiveRecipeNumberField: View {
+    let label: String
+    let suffix: String
+    @Binding var value: Double?
+    let allowsDecimal: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 1) {
+                TextField("—", value: $value,
+                          format: .number.precision(.fractionLength(allowsDecimal ? 0...1 : 0...0)))
+                    .keyboardType(allowsDecimal ? .decimalPad : .numberPad)
+                    .multilineTextAlignment(.trailing)
+                    .font(.param(.title, weight: .semibold))
+                    .frame(minWidth: 44, maxWidth: 76, minHeight: 44)
+                    .padding(.horizontal, 4)
+                    .background(Theme.crema.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                    .accessibilityLabel(label)
+                Text(suffix).font(.param(.title, weight: .semibold))
+            }
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Large digit-entry time used directly in the live pour console. Typing `125` becomes `1:25`,
+/// matching the recipe editor while remaining legible at arm's length during a pour.
+private struct LivePourTimeField: View {
+    let placeholder: String
+    @Binding var seconds: Int?
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.center)
+            .focused($focused)
+            .font(.param(.title3, weight: .semibold))
+            .monospacedDigit()
+            .frame(width: 68).frame(minHeight: 44)
+            .background(Theme.crema.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+            .onChange(of: text) { _, newValue in
+                let (formatted, secs) = liveTimeEntry(newValue)
+                if formatted != newValue { text = formatted }
+                seconds = secs
+            }
+            .onChange(of: seconds) { _, value in
+                if !focused { text = value.map(timeText) ?? "" }
+            }
+            .onAppear { text = seconds.map(timeText) ?? "" }
+            .accessibilityLabel(placeholder == "end" ? "Pour end time" :
+                (placeholder == "start" ? "Pour start time" : "Bloom time"))
+    }
+}
 
 /// A first-class, in-the-moment time capture for the number you sit and watch during a brew —
 /// drawdown for pourover, shot time for espresso. A live stopwatch (tap Start when it begins,

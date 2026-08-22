@@ -550,9 +550,10 @@ export function BrewEditor({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <BrewStatGrid recipe={recipe} method={method} />
-              {method === "pourover" && recipe.pours.length > 0 && (
-                <PourPlanList recipe={recipe} />
+              <BrewStatGrid recipe={recipe} method={method} onChange={setRecipe} />
+              {method === "pourover" &&
+                (recipe.pours.length > 0 || (recipe.pourCount ?? 0) > 0) && (
+                <PourPlanList recipe={recipe} onChange={setRecipe} />
               )}
               {activeBean.roaster_notes && (
                 <div className="flex flex-col gap-1.5 border-t pt-3">
@@ -564,17 +565,6 @@ export function BrewEditor({
               )}
             </CardContent>
           </Card>
-          <details className="rounded-xl border bg-card p-4">
-            <summary className="cursor-pointer font-medium">Adjust recipe</summary>
-            <div className="mt-4">
-              <RecipeEditor
-                recipe={recipe}
-                onChange={setRecipe}
-                method={method}
-                grinders={book.grinders.filter((g) => !g.deleted_at)}
-              />
-            </div>
-          </details>
           <Card>
             <CardHeader>
               <CardTitle>
