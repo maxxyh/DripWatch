@@ -84,6 +84,7 @@ struct BeanDetailView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
+                        .hitTarget()
                 }
                 .accessibilityLabel("Bean options")
             }
