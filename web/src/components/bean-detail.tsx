@@ -55,6 +55,7 @@ import {
   newPourover,
   photoUrl,
   pricePerGramSGD,
+  pricePerGramTextSGD,
   singlePendingPlanPatch,
 } from "@/lib/domain";
 import { mutate } from "@/lib/client-mutations";
@@ -514,14 +515,7 @@ function CharacterCard({
           </CardTitle>
           {pricePerGram !== null && (
             <span className="shrink-0 text-sm font-semibold text-primary">
-              S${
-                pricePerGram < 1_000
-                  ? pricePerGram.toFixed(2)
-                  : new Intl.NumberFormat(undefined, {
-                      notation: "compact",
-                      maximumSignificantDigits: 3,
-                    }).format(pricePerGram)
-              }/g
+              {pricePerGramTextSGD(pricePerGram)}
             </span>
           )}
         </div>

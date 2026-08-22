@@ -9,6 +9,7 @@ import {
   normalizeTerm,
   normalizeTerms,
   pricePerGramSGD,
+  pricePerGramTextSGD,
   reconcileWater,
   liveTimeEntry,
   secondsFromDigits,
@@ -134,6 +135,8 @@ describe("native input behavior", () => {
     expect(pricePerGramSGD(36.5, null)).toBeNull();
     expect(pricePerGramSGD(0, 250)).toBeNull();
     expect(pricePerGramSGD(Number.MAX_VALUE, Number.MIN_VALUE)).toBeNull();
+    expect(pricePerGramTextSGD(0.146)).toBe("S$0.15/g");
+    expect(pricePerGramTextSGD(1_250, "en-SG")).toBe("S$1.25K/g");
   });
   it("treats the last two digits as seconds", () => {
     expect(secondsFromDigits("45")).toBe(45);

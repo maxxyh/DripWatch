@@ -124,6 +124,15 @@ export const pricePerGramSGD = (
   const result = priceSGD / bagSizeGrams;
   return Number.isFinite(result) ? result : null;
 };
+export const pricePerGramTextSGD = (price: number, locale?: string) =>
+  `S$${
+    price < 1_000
+      ? price.toFixed(2)
+      : new Intl.NumberFormat(locale, {
+          notation: "compact",
+          maximumSignificantDigits: 3,
+        }).format(price)
+  }/g`;
 export const timeText = (n: number) =>
   `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
 export function secondsFromDigits(raw: string) {
