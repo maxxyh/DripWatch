@@ -357,6 +357,7 @@ function PlanPrompt({
   refresh: () => Promise<void>;
 }) {
   const router = useRouter();
+  const hasBrew = latest !== undefined;
   const method = latest?.method_raw ?? "pourover";
   const seed = latest
     ? asPlanSeed(latest.recipe)
@@ -437,7 +438,7 @@ function PlanPrompt({
       <button
         type="button"
         className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-4 py-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-        disabled={offline || working}
+        disabled={!hasBrew || offline || working}
         aria-expanded={editing}
         onClick={() => {
           setDraft(seed);
@@ -448,7 +449,9 @@ function PlanPrompt({
         <CornerDownRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         <span className="flex flex-col">
           <span className="text-sm font-medium">Next brew</span>
-          <span className="text-xs text-muted-foreground">Plan a change</span>
+          <span className="text-xs text-muted-foreground">
+            {hasBrew ? "Plan a change" : "Available after first brew"}
+          </span>
         </span>
       </button>
       {editing && (

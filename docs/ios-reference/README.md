@@ -56,6 +56,9 @@ fresh visual gap worth keeping around.
   `recipe-readout.tsx`; its large stopwatch digits are also the direct typed-time field, rather
   than duplicating the observation in a second input below. Read-only recipe summaries elsewhere
   still use their existing rendering.
+- **The empty next-brew prompt belongs to the feedback loop.** On a newly added bean with no brew
+  history it remains visible for discoverability, but is disabled and says “Available after first
+  brew.” It becomes the active “Plan a change” prompt once the first brew exists.
 - **Roaster's Notes is an Enter-to-add chip input**, not a comma-separated free-text field.
   `edit-bean-roaster-notes.jpg` shows existing notes (`Apricot`, `Honey`, `Apple Tart`) as pills
   with a sparkle icon, an `Add...` field with a return-arrow icon below, and a caption

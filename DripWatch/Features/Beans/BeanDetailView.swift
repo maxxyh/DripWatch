@@ -209,7 +209,7 @@ struct BeanDetailView: View {
                     Text("Next brew")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color(.label))
-                    Text("Plan a change")
+                    Text(bean.timeline.isEmpty ? "Available after first brew" : "Plan a change")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -225,8 +225,12 @@ struct BeanDetailView: View {
             .background(Theme.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
+        .disabled(bean.timeline.isEmpty)
+        .opacity(bean.timeline.isEmpty ? 0.45 : 1)
         .accessibilityLabel("Next brew, plan a change")
-        .accessibilityHint("Opens the next brew plan")
+        .accessibilityHint(bean.timeline.isEmpty
+            ? "Log the first brew before planning a change"
+            : "Opens the next brew plan")
     }
 
     private var emptyHistory: some View {
