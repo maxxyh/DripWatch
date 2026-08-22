@@ -236,9 +236,11 @@ export function BrewStatGrid({
               }}
             />
           ) : (
-            <span className="font-mono text-3xl font-bold tabular-nums">
-              {stat.value}
-            </span>
+            <div className="flex h-11 items-center">
+              <span className="font-mono text-3xl font-bold leading-none tabular-nums">
+                {stat.value}
+              </span>
+            </div>
           )}
           <span className="text-xs text-muted-foreground">{stat.label}</span>
         </div>
@@ -261,7 +263,7 @@ function LiveNumberInput({
   onChange: (value?: number) => void;
 }) {
   return (
-    <label className="flex min-h-11 items-center rounded-lg bg-muted/40 px-1 focus-within:ring-2 focus-within:ring-ring">
+    <label className="flex h-11 items-center border-b border-transparent focus-within:border-primary">
       <Input
         type="text"
         inputMode={integer ? "numeric" : "decimal"}
@@ -274,9 +276,9 @@ function LiveNumberInput({
           const parsed = Number(raw);
           if (Number.isFinite(parsed)) onChange(integer ? Math.round(parsed) : parsed);
         }}
-        className="h-10 w-20 border-0 bg-transparent px-1 text-right font-mono text-3xl font-bold tabular-nums shadow-none focus-visible:ring-0"
+        className="h-11 w-auto min-w-[2ch] max-w-20 rounded-none border-0 bg-transparent px-0 text-right font-mono text-3xl font-bold leading-none tabular-nums shadow-none [field-sizing:content] focus-visible:ring-0 md:text-3xl dark:bg-transparent"
       />
-      <span className="font-mono text-3xl font-bold">{suffix}</span>
+      <span className="font-mono text-3xl font-bold leading-none">{suffix}</span>
     </label>
   );
 }
@@ -325,7 +327,7 @@ export function PourPlanList({
             aria-label="Bloom time"
             seconds={recipe.bloomTimeSec}
             onChange={(seconds) => onChange({ ...recipe, bloomTimeSec: seconds })}
-            className="h-11 w-24 text-center text-lg font-semibold"
+            className="h-11 w-16 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
             placeholder="—"
           />
         </div>
@@ -370,7 +372,7 @@ export function PourPlanList({
                     aria-label={`Pour ${index + 1} start time`}
                     seconds={pour?.startSec}
                     onChange={(seconds) => updatePour({ startSec: seconds })}
-                    className="h-11 w-[4.5rem] px-1 text-center text-lg font-semibold"
+                    className="h-11 w-14 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
                     placeholder="start"
                   />
                   <span className="text-muted-foreground">–</span>
@@ -379,7 +381,7 @@ export function PourPlanList({
                     aria-label={`Pour ${index + 1} end time`}
                     seconds={pour?.endSec}
                     onChange={(seconds) => updatePour({ endSec: seconds })}
-                    className="h-11 w-[4.5rem] px-1 text-center text-lg font-semibold"
+                    className="h-11 w-14 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
                     placeholder="end"
                   />
                 </div>
@@ -394,7 +396,7 @@ export function PourPlanList({
               )}
             </div>
             {onChange ? (
-              <label className="flex min-h-11 shrink-0 items-center rounded-lg bg-muted/40 px-1 focus-within:ring-2 focus-within:ring-ring">
+              <label className="flex min-h-11 shrink-0 items-baseline border-b border-transparent focus-within:border-primary">
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -407,7 +409,7 @@ export function PourPlanList({
                     const parsed = Number(raw);
                     if (Number.isFinite(parsed)) updatePour({ toGrams: parsed });
                   }}
-                  className="h-10 w-16 border-0 bg-transparent px-1 text-right font-mono text-lg font-semibold tabular-nums shadow-none focus-visible:ring-0"
+                  className="h-10 w-14 rounded-none border-0 bg-transparent px-0 text-right font-mono text-base font-semibold tabular-nums shadow-none focus-visible:ring-0 md:text-base dark:bg-transparent"
                 />
                 <span className="text-sm text-muted-foreground">g</span>
               </label>

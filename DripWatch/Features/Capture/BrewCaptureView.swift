@@ -804,7 +804,10 @@ private struct LockedBrewStat: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.param(.title, weight: .semibold))
+            HStack(spacing: 0) {
+                Text(value).font(.param(.title, weight: .semibold))
+            }
+            .frame(height: 44, alignment: .center)
             Text(label).font(.caption2).foregroundStyle(.secondary)
         }
     }
@@ -817,20 +820,27 @@ private struct LiveRecipeNumberField: View {
     let suffix: String
     @Binding var value: Double?
     let allowsDecimal: Bool
+    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 1) {
                 TextField("—", value: $value,
                           format: .number.precision(.fractionLength(allowsDecimal ? 0...1 : 0...0)))
+                    .textFieldStyle(.plain)
                     .keyboardType(allowsDecimal ? .decimalPad : .numberPad)
                     .multilineTextAlignment(.trailing)
+                    .focused($focused)
                     .font(.param(.title, weight: .semibold))
-                    .frame(minWidth: 44, maxWidth: 76, minHeight: 44)
-                    .padding(.horizontal, 4)
-                    .background(Theme.crema.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                    .frame(minWidth: 44, maxWidth: 76)
                     .accessibilityLabel(label)
                 Text(suffix).font(.param(.title, weight: .semibold))
+            }
+            .frame(height: 44, alignment: .center)
+            .overlay(alignment: .bottom) {
+                if focused {
+                    Rectangle().fill(Theme.accent).frame(height: 2)
+                }
             }
             Text(label).font(.caption2).foregroundStyle(.secondary)
         }
@@ -853,7 +863,10 @@ private struct LivePourTimeField: View {
             .font(.param(.title3, weight: .semibold))
             .monospacedDigit()
             .frame(width: 68).frame(minHeight: 44)
-            .background(Theme.crema.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(focused ? Theme.accent : .secondary.opacity(0.28))
+                    .frame(height: focused ? 2 : 1)
+            }
             .onChange(of: text) { _, newValue in
                 let (formatted, secs) = liveTimeEntry(newValue)
                 if formatted != newValue { text = formatted }
