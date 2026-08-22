@@ -79,6 +79,8 @@ work is not finished.
 
 Launching the DEBUG app with `-seedSampleData 1` is a fixture-only mode: `DripWatchApp` creates
 an in-memory SwiftData container and prevents `SyncEngine` from loading Supabase configuration.
+Its shared sync outbox also disables recording, because model `markDirty()` calls bypass the
+engine and would otherwise persist fixture UUIDs for the next normal launch.
 This double boundary matters because sync bootstrap intentionally uploads every row from an
 existing local installation; seeding a persistent configured store before bootstrap would make
 fixtures look like user data. Browser verification must likewise avoid saving fixture forms

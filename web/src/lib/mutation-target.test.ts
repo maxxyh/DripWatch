@@ -21,7 +21,22 @@ describe("development mutation isolation", () => {
     })).toBe(true);
   });
 
-  it("does not affect deployed production writes", () => {
-    expect(remoteDevelopmentWritesAllowed({ NODE_ENV: "production" })).toBe(true);
+  it("blocks local production mode and preview deployments", () => {
+    expect(remoteDevelopmentWritesAllowed({
+      NODE_ENV: "production",
+      SUPABASE_URL: "https://production-project.supabase.co",
+    })).toBe(false);
+    expect(remoteDevelopmentWritesAllowed({
+      NODE_ENV: "production",
+      VERCEL_ENV: "preview",
+      SUPABASE_URL: "https://production-project.supabase.co",
+    })).toBe(false);
+  });
+
+  it("allows the deployed production environment", () => {
+    expect(remoteDevelopmentWritesAllowed({
+      NODE_ENV: "production",
+      VERCEL_ENV: "production",
+    })).toBe(true);
   });
 });

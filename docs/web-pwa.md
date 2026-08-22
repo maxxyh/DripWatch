@@ -113,8 +113,9 @@ coloring, rather than one undifferentiated flat list of chips.
 
 Local development is read-only when `SUPABASE_URL` points to a hosted project. Mutation and photo
 upload routes return `403` unless Supabase is local or `ALLOW_REMOTE_DEV_MUTATIONS=1` is explicitly
-set. Visual verification should keep the guard enabled; remote opt-in is reserved for deliberate
-manual data work.
+set. The canonical Vercel production deployment is also allowed (`VERCEL_ENV=production`), while
+local production-mode servers and preview deployments remain guarded. Visual verification should
+keep the guard enabled; remote opt-in is reserved for deliberate manual data work.
 
 Photo uploads are also decoded at the server boundary and rejected unless they are valid JPEGs
 whose width and height are both at most 1400 pixels. On the read side, `/api/photos/[bucket]/...`
