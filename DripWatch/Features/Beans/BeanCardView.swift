@@ -122,6 +122,14 @@ struct BeanCardView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                if let price = bean.pricePerGramSGD {
+                    Text(pricePerGramText(price))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .accessibilityLabel("\(price.formatted(.number.precision(.fractionLength(2)))) Singapore dollars per gram")
+                }
                 // Roaster's tasting notes on the shelf — the enticement to pick this bag.
                 roasterNoteChips(limit: 3)
             } else {
@@ -242,6 +250,9 @@ struct BeanCardView: View {
     private var accessibilitySummary: String {
         var s = bean.name.isEmpty ? "Untitled bean" : bean.name
         if let r = bean.roasterName, !r.isEmpty { s += ", roasted by \(r)" }
+        if let price = bean.pricePerGramSGD {
+            s += ", \(price.formatted(.number.precision(.fractionLength(2)))) Singapore dollars per gram"
+        }
         s += ", \(bean.togetherLabel.lowercased())"
         return s
     }

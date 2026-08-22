@@ -1,13 +1,24 @@
 import Foundation
 import SwiftData
 
-/// DEBUG-only seed data for verification/screenshots. Only runs when the app is launched with
-/// `-seedSampleData 1` and the store is empty, so it never affects real use. Mirrors the real
-/// notebook (Voyager: 22/06 → 23/06) so the brew-diff annotation can be verified.
+/// DEBUG-only seed data for verification/screenshots. Sample mode uses an isolated in-memory
+/// store with remote sync disabled, so these fixtures can never persist or reach Supabase.
 enum SampleData {
+    static var isRequested: Bool {
+        isRequested(arguments: ProcessInfo.processInfo.arguments)
+    }
+
+    static func isRequested(arguments: [String]) -> Bool {
+        arguments.indices.contains { index in
+            arguments[index] == "-seedSampleData"
+                && arguments.indices.contains(index + 1)
+                && arguments[index + 1] == "1"
+        }
+    }
+
     static func seedIfRequested(_ context: ModelContext) {
         #if DEBUG
-        guard UserDefaults.standard.bool(forKey: "seedSampleData") else { return }
+        guard isRequested else { return }
         let existing = try? context.fetch(FetchDescriptor<Bean>())
         guard (existing?.isEmpty ?? true) else { return }
 
@@ -26,6 +37,8 @@ enum SampleData {
         voyager.roastLevel = "Medium"
         voyager.roastDate = day(5, 6)
         voyager.roasterNotes = "Dates, vanilla, apple"
+        voyager.priceSGDCents = 3_650
+        voyager.bagSizeGrams = 250
         voyager.myFlavorTags = ["honey", "apple"]
         context.insert(voyager)
 
@@ -79,6 +92,8 @@ enum SampleData {
         crimson.varietal = "THA1"
         crimson.process = "Anoxic Natural"
         crimson.roasterNotes = "Pineapple, dried guava, prune, dark chocolate"
+        crimson.priceSGDCents = 2_800
+        crimson.bagSizeGrams = 200
         crimson.myFlavorTags = ["raisin", "dark chocolate"]
         context.insert(crimson)
 

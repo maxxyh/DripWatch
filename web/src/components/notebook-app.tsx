@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BeanRow, Notebook } from "@/lib/domain";
-import { photoUrl } from "@/lib/domain";
+import { photoUrl, pricePerGramSGD, pricePerGramTextSGD } from "@/lib/domain";
 
 const BeanDetail = dynamic(() => import("./bean-detail"));
 
@@ -332,6 +332,7 @@ function BeanCard({
     count = data.brews.filter(
       (b) => !b.deleted_at && b.bean_id === bean.id,
     ).length,
+    pricePerGram = pricePerGramSGD(bean.price_sgd, bean.bag_size_grams),
     notes = (bean.roaster_notes ?? "")
       .split(",")
       .map((x) => x.trim())
@@ -387,10 +388,17 @@ function BeanCard({
               ))}
             </div>
           )}
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {count} brew{count === 1 ? "" : "s"} together
-            </span>
+          <div className="flex items-end justify-between gap-2 text-xs text-muted-foreground">
+            <div className="flex min-w-0 flex-col gap-1">
+              {pricePerGram !== null && (
+                <span className="font-semibold text-primary">
+                  {pricePerGramTextSGD(pricePerGram)}
+                </span>
+              )}
+              <span>
+                {count} brew{count === 1 ? "" : "s"} together
+              </span>
+            </div>
             <ChevronRight aria-hidden />
           </div>
         </CardContent>

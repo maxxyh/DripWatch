@@ -6,6 +6,13 @@ import Testing
 /// ModelContainer needed — these paths only touch stored properties and the `brews` array).
 struct BeanSeedTests {
 
+    @Test func sampleModeRequiresTheExplicitLaunchArgumentValue() {
+        #expect(SampleData.isRequested(arguments: ["DripWatch", "-seedSampleData", "1"]))
+        #expect(!SampleData.isRequested(arguments: ["DripWatch", "-seedSampleData", "0"]))
+        #expect(!SampleData.isRequested(arguments: ["DripWatch", "-seedSampleData"]))
+        #expect(!SampleData.isRequested(arguments: ["DripWatch"]))
+    }
+
     @Test func seedFallsBackToLastBrewThenPending() {
         let bean = Bean(name: "Test")
 

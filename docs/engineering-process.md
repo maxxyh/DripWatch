@@ -74,3 +74,12 @@ Before declaring a change complete:
 
 Documentation is part of the implementation. If code, deployed state, and guidance disagree, the
 work is not finished.
+
+# Verification data isolation
+
+Launching the DEBUG app with `-seedSampleData 1` is a fixture-only mode: `DripWatchApp` creates
+an in-memory SwiftData container and prevents `SyncEngine` from loading Supabase configuration.
+This double boundary matters because sync bootstrap intentionally uploads every row from an
+existing local installation; seeding a persistent configured store before bootstrap would make
+fixtures look like user data. Browser verification must likewise avoid saving fixture forms
+against the hosted API; use read-only interaction or a separately configured local Supabase.

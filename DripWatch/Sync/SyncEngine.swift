@@ -22,7 +22,8 @@ final class SyncEngine: ObservableObject {
     init(
         context: ModelContext,
         remote: (any RemoteStore)? = nil,
-        outbox: SyncOutbox? = nil
+        outbox: SyncOutbox? = nil,
+        automaticallyConfigureRemote: Bool = true
     ) {
         self.context = context
         self.outbox = outbox ?? .shared
@@ -30,7 +31,7 @@ final class SyncEngine: ObservableObject {
         if let remote {
             self.remote = remote
             status = .idle(lastSyncedAt: nil)
-        } else if let config = try? SupabaseConfig.load() {
+        } else if automaticallyConfigureRemote, let config = try? SupabaseConfig.load() {
             self.remote = SupabaseRemoteStore(config: config)
             status = .idle(lastSyncedAt: nil)
         } else {

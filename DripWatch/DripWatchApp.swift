@@ -10,12 +10,16 @@ struct DripWatchApp: App {
     @StateObject private var syncEngine: SyncEngine
 
     init() {
-        let container = Self.makeContainer()
+        let sampleMode = SampleData.isRequested
+        let container = Self.makeContainer(isStoredInMemoryOnly: sampleMode)
         self.container = container
-        _syncEngine = StateObject(wrappedValue: SyncEngine(context: container.mainContext))
+        _syncEngine = StateObject(wrappedValue: SyncEngine(
+            context: container.mainContext,
+            automaticallyConfigureRemote: !sampleMode
+        ))
     }
 
-    private static func makeContainer() -> ModelContainer {
+    private static func makeContainer(isStoredInMemoryOnly: Bool = false) -> ModelContainer {
         let schema = Schema([
             Bean.self,
             BeanPhoto.self,
@@ -23,7 +27,7 @@ struct DripWatchApp: App {
             Grinder.self,
             LexiconTerm.self,
         ])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isStoredInMemoryOnly)
 
         do {
             return try ModelContainer(for: schema, configurations: [config])
