@@ -100,7 +100,7 @@ struct BeanCardView: View {
                     .lineLimit(style == .full ? 2 : 1)
                 Spacer(minLength: 0)
                 if style == .full, let price = bean.pricePerGramSGD {
-                    Text("S$\(price.formatted(.number.precision(.fractionLength(2))))/g")
+                    Text(pricePerGramText(price))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.accent)
                         .fixedSize()
@@ -142,6 +142,13 @@ struct BeanCardView: View {
         }
         .padding(style == .full ? Theme.Space.m : 12)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func pricePerGramText(_ price: Double) -> String {
+        let formatted = price < 1_000
+            ? price.formatted(.number.precision(.fractionLength(2)))
+            : price.formatted(.number.notation(.compactName).precision(.significantDigits(3)))
+        return "S$\(formatted)/g"
     }
 
     private var shelfSubtitle: String? {

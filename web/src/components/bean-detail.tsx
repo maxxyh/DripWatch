@@ -54,6 +54,7 @@ import {
   hasTaste,
   newPourover,
   photoUrl,
+  pricePerGramSGD,
   singlePendingPlanPatch,
 } from "@/lib/domain";
 import { mutate } from "@/lib/client-mutations";
@@ -479,6 +480,7 @@ function CharacterCard({
     .map((photo) => photoUrl("bean-photos", photo.remote_path))
     .filter((url): url is string => !!url);
   const hero = photoUrls[0] ?? null;
+  const pricePerGram = pricePerGramSGD(bean.price_sgd, bean.bag_size_grams);
   return (
     <Card className="overflow-hidden py-0">
       <button
@@ -510,9 +512,16 @@ function CharacterCard({
           <CardTitle className="text-3xl">
             {bean.name || "Untitled bean"}
           </CardTitle>
-          {bean.price_sgd && bean.bag_size_grams && (
+          {pricePerGram !== null && (
             <span className="shrink-0 text-sm font-semibold text-primary">
-              S${(bean.price_sgd / bean.bag_size_grams).toFixed(2)}/g
+              S${
+                pricePerGram < 1_000
+                  ? pricePerGram.toFixed(2)
+                  : new Intl.NumberFormat(undefined, {
+                      notation: "compact",
+                      maximumSignificantDigits: 3,
+                    }).format(pricePerGram)
+              }/g
             </span>
           )}
         </div>

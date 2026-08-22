@@ -431,7 +431,8 @@ export function BeanEditor({ id }: { id?: string }) {
                     id="price-sgd"
                     type="number"
                     inputMode="decimal"
-                    min="0"
+                    min="0.01"
+                    max="9999999999.99"
                     step="0.01"
                     className={plainInputClass}
                     value={form.price_sgd}
@@ -444,12 +445,18 @@ export function BeanEditor({ id }: { id?: string }) {
                     id="bag-size-grams"
                     type="number"
                     inputMode="decimal"
-                    min="0"
-                    step="0.1"
+                    min="0.01"
+                    step="any"
                     className={plainInputClass}
                     value={form.bag_size_grams}
                     onChange={(e) => change("bag_size_grams", e.target.value)}
                     placeholder="250"
+                  />
+                  <ChipRow
+                    options={["100", "200", "250"]}
+                    value={form.bag_size_grams}
+                    onSelect={(value) => change("bag_size_grams", value)}
+                    suffix="g"
                   />
                 </PlainField>
               </CardContent>
@@ -575,10 +582,12 @@ function ChipRow({
   options,
   value,
   onSelect,
+  suffix,
 }: {
   options: string[];
   value: string;
   onSelect: (value: string) => void;
+  suffix?: string;
 }) {
   return (
     <div className="flex flex-wrap gap-2 pt-1">
@@ -598,7 +607,7 @@ function ChipRow({
             aria-pressed={active}
           >
             {active && <Check className="size-3.5" aria-hidden />}
-            {option}
+            {option}{suffix ? ` ${suffix}` : ""}
           </button>
         );
       })}

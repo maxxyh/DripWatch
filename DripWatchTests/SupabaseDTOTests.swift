@@ -47,7 +47,7 @@ struct SupabaseDTOTests {
         bean.roastLevel = "Light"
         bean.roastDate = roastDate
         bean.roasterNotes = "peach, jasmine"
-        bean.priceSGD = 36.50
+        bean.priceSGDCents = 3_650
         bean.bagSizeGrams = 250
         bean.myFlavorTags = ["stone fruit", "floral"]
         bean.finishedAt = Date(timeIntervalSince1970: 1_700_000_300)
@@ -91,7 +91,7 @@ struct SupabaseDTOTests {
         #expect(beanDTO.makeModel().name == bean.name)
         #expect(beanDTO.makeModel().roastDate == bean.roastDate)
         #expect(beanDTO.makeModel().pendingNextPourover == bean.pendingNextPourover)
-        #expect(beanDTO.makeModel().priceSGD == 36.50)
+        #expect(beanDTO.makeModel().priceSGDCents == 3_650)
         #expect(beanDTO.makeModel().bagSizeGrams == 250)
 
         let brewDTO = try roundTrip(BrewDTO(brew, photoPath: "brews/brew/result.jpg"), encoder: encoder, decoder: decoder)

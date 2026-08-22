@@ -23,7 +23,7 @@ struct BeanDTO: SupabaseRow {
     var roastLevel: String?
     var roastDate: Date?
     var roasterNotes: String?
-    var priceSGD: Double?
+    var priceSGD: Decimal?
     var bagSizeGrams: Double?
     var myFlavorTags: [String]
     var finishedAt: Date?
@@ -62,7 +62,7 @@ struct BeanDTO: SupabaseRow {
         roastLevel = bean.roastLevel
         roastDate = bean.roastDate
         roasterNotes = bean.roasterNotes
-        priceSGD = bean.priceSGD
+        priceSGD = bean.priceSGDCents.map { Decimal($0) / 100 }
         bagSizeGrams = bean.bagSizeGrams
         myFlavorTags = bean.myFlavorTags
         finishedAt = bean.finishedAt
@@ -91,7 +91,7 @@ struct BeanDTO: SupabaseRow {
         bean.roastLevel = roastLevel
         bean.roastDate = roastDate
         bean.roasterNotes = roasterNotes
-        bean.priceSGD = priceSGD
+        bean.priceSGDCents = priceSGD.map { NSDecimalNumber(decimal: $0 * 100).intValue }
         bean.bagSizeGrams = bagSizeGrams
         bean.myFlavorTags = myFlavorTags
         bean.finishedAt = finishedAt

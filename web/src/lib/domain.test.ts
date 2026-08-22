@@ -8,6 +8,7 @@ import {
   newPourover,
   normalizeTerm,
   normalizeTerms,
+  pricePerGramSGD,
   reconcileWater,
   liveTimeEntry,
   secondsFromDigits,
@@ -127,6 +128,13 @@ describe("instrument formatting and diffs", () => {
   });
 });
 describe("native input behavior", () => {
+  it("derives SGD per gram only from positive complete purchase values", () => {
+    expect(pricePerGramSGD(36.5, 250)).toBeCloseTo(0.146);
+    expect(pricePerGramSGD(null, 250)).toBeNull();
+    expect(pricePerGramSGD(36.5, null)).toBeNull();
+    expect(pricePerGramSGD(0, 250)).toBeNull();
+    expect(pricePerGramSGD(Number.MAX_VALUE, Number.MIN_VALUE)).toBeNull();
+  });
   it("treats the last two digits as seconds", () => {
     expect(secondsFromDigits("45")).toBe(45);
     expect(secondsFromDigits("230")).toBe(150);

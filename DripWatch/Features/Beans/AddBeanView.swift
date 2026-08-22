@@ -67,8 +67,8 @@ struct AddBeanView: View {
         // Default roast date ON for new beans (we only buy dated bags); reflect reality when editing.
         _hasRoastDate = State(initialValue: bean == nil ? true : (bean?.roastDate != nil))
         _roastDate = State(initialValue: bean?.roastDate ?? .now)
-        _priceSGD = State(initialValue: bean?.priceSGD.map(Self.editableNumber) ?? "")
-        _bagSizeGrams = State(initialValue: bean?.bagSizeGrams.map(Self.editableNumber) ?? "")
+        _priceSGD = State(initialValue: bean?.priceSGD.map { PurchaseValue.editingText($0, maxFractionDigits: 2) } ?? "")
+        _bagSizeGrams = State(initialValue: bean?.bagSizeGrams.map { PurchaseValue.editingText($0, maxFractionDigits: 2) } ?? "")
         _roasterNoteTags = State(initialValue: bean?.roasterNoteList ?? [])
 
         // Load existing gallery (by identity so unchanged photos aren't re-inserted), falling
@@ -94,9 +94,18 @@ struct AddBeanView: View {
                     LabeledTextField(label: "Name", placeholder: "e.g. Pure Forest", text: $name)
                     LabeledTextField(label: "Roaster", placeholder: "e.g. Nylon", text: $roaster)
                 }
-                Section("Purchase") {
+                Section {
                     LabeledNumericField(label: "Price (SGD)", placeholder: "e.g. 32.00", text: $priceSGD)
-                    LabeledNumericField(label: "Bag size (g)", placeholder: "e.g. 250", text: $bagSizeGrams)
+                    VStack(alignment: .leading, spacing: 6) {
+                        LabeledNumericField(label: "Bag size (g)", placeholder: "e.g. 250", text: $bagSizeGrams)
+                        PresetChips(options: ["100", "200", "250"], selection: $bagSizeGrams, suffix: "g")
+                    }
+                } header: {
+                    Text("Purchase")
+                } footer: {
+                    if let purchaseInputError {
+                        Text(purchaseInputError).foregroundStyle(.red)
+                    }
                 }
                 unresolvedSection
                 Section("Origin") {
@@ -415,7 +424,22 @@ struct AddBeanView: View {
     // MARK: Save
 
     /// Save is allowed with just a photo or just a name — the card works from either.
-    private var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty || !photoDrafts.isEmpty }
+    private var canSave: Bool {
+        (!name.trimmingCharacters(in: .whitespaces).isEmpty || !photoDrafts.isEmpty)
+            && purchaseInputError == nil
+    }
+
+    private var purchaseInputError: String? {
+        if !priceSGD.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           PurchaseValue.priceCents(priceSGD) == nil {
+            return "Enter a positive SGD price with no more than 2 decimal places."
+        }
+        if !bagSizeGrams.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           PurchaseValue.positiveNumber(bagSizeGrams) == nil {
+            return "Enter a positive bag size in grams."
+        }
+        return nil
+    }
 
     private func save() {
         let bean = editingBean ?? Bean()
@@ -430,22 +454,13 @@ struct AddBeanView: View {
         bean.roastLevel = roastLevel.nilIfBlank?.normalizedTerm
         bean.roastDate = hasRoastDate ? roastDate : nil
         bean.roasterNotes = roasterNoteTags.isEmpty ? nil : roasterNoteTags.normalizedTerms.joined(separator: ", ")
-        bean.priceSGD = positiveNumber(priceSGD)
-        bean.bagSizeGrams = positiveNumber(bagSizeGrams)
+        bean.priceSGDCents = PurchaseValue.priceCents(priceSGD)
+        bean.bagSizeGrams = PurchaseValue.positiveNumber(bagSizeGrams)
         if editingBean == nil { context.insert(bean) }
         applyPhotos(to: bean)
         bean.markDirty()
         Haptics.success()
         dismiss()
-    }
-
-    private static func editableNumber(_ value: Double) -> String {
-        value.formatted(.number.precision(.fractionLength(0...2)))
-    }
-
-    private func positiveNumber(_ text: String) -> Double? {
-        let value = Double(text.replacingOccurrences(of: ",", with: "."))
-        return value.flatMap { $0 > 0 && $0.isFinite ? $0 : nil }
     }
 
     /// Reconcile the edited gallery onto the bean: soft-delete removed photos, reorder kept ones,
@@ -513,6 +528,7 @@ private struct LabeledNumericField: View {
 private struct PresetChips: View {
     let options: [String]
     @Binding var selection: String
+    var suffix: String? = nil
 
     var body: some View {
         WrapLayout(spacing: 6, lineSpacing: 6) {
@@ -522,13 +538,13 @@ private struct PresetChips: View {
                     Haptics.select()
                     selection = active ? "" : option
                 } label: {
-                    Chip(text: option,
+                    Chip(text: suffix.map { "\(option) \($0)" } ?? option,
                          symbol: active ? "checkmark" : nil,
                          tint: active ? Theme.accent : .secondary)
                         .hitTarget(34)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(option)\(active ? ", selected" : "")")
+                .accessibilityLabel("\(option)\(suffix.map { " \($0)" } ?? "")\(active ? ", selected" : "")")
             }
         }
     }
