@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeSelect } from "@/components/theme-select";
+import { cn } from "@/lib/utils";
 import type { BeanRow, Notebook } from "@/lib/domain";
 import { photoUrl, pricePerGramSGD, pricePerGramTextSGD } from "@/lib/domain";
 
@@ -260,6 +261,14 @@ const sortLabels: Record<SortField, string> = {
   roast: "Roast date",
 };
 
+type MethodFilter = "all" | "pourover" | "espresso";
+
+const methodLabels: Record<MethodFilter, string> = {
+  all: "All",
+  pourover: "Pourover",
+  espresso: "Espresso",
+};
+
 function compareBeans(
   a: BeanRow,
   b: BeanRow,
@@ -298,14 +307,22 @@ function Shelf({ data, offline }: { data: Notebook; offline: boolean }) {
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortField>("updated");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [methodFilter, setMethodFilter] = useState<MethodFilter>("all");
 
   const normalizedQuery = query.trim().toLowerCase();
   const active = data.beans
-    .filter(
-      (b) =>
-        !b.deleted_at &&
-        (!normalizedQuery || b.name.toLowerCase().includes(normalizedQuery)),
-    )
+    .filter((b) => {
+      if (b.deleted_at) return false;
+      if (normalizedQuery && !b.name.toLowerCase().includes(normalizedQuery))
+        return false;
+      if (methodFilter === "all") return true;
+      return data.brews.some(
+        (brew) =>
+          !brew.deleted_at &&
+          brew.bean_id === b.id &&
+          brew.method_raw === methodFilter,
+      );
+    })
     .sort((a, b) => compareBeans(a, b, sortBy, sortDir));
   const fresh = active.filter((b) => !b.finished_at);
   const finished = active.filter((b) => b.finished_at);
@@ -382,11 +399,35 @@ function Shelf({ data, offline }: { data: Notebook; offline: boolean }) {
         </div>
       </div>
 
+      <div
+        className="mb-6 flex flex-wrap gap-2"
+        role="group"
+        aria-label="Filter by brew method"
+      >
+        {(["all", "pourover", "espresso"] as MethodFilter[]).map((value) => (
+          <Button
+            key={value}
+            size="sm"
+            aria-pressed={methodFilter === value}
+            onClick={() => setMethodFilter(value)}
+            className={cn(
+              buttonVariants({
+                variant: methodFilter === value ? "default" : "outline",
+                size: "xl",
+              }),
+              "rounded-full",
+            )}
+          >
+            {methodLabels[value]}
+          </Button>
+        ))}
+      </div>
+
       {fresh.length ? (
         <Masonry beans={fresh} data={data} />
-      ) : normalizedQuery ? (
+      ) : normalizedQuery || methodFilter !== "all" ? (
         <p className="text-sm text-muted-foreground">
-          No active beans match your search.
+          No active beans match your filters.
         </p>
       ) : (
         <Empty className="border">
