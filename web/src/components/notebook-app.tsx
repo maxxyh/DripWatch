@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowDown,
+  ArrowUp,
   ChevronRight,
   Cloud,
   CloudOff,
@@ -13,6 +15,7 @@ import {
   LogOut,
   Plus,
   RefreshCw,
+  Search,
   Sparkles,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -33,6 +36,14 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeSelect } from "@/components/theme-select";
 import type { BeanRow, Notebook } from "@/lib/domain";
@@ -236,12 +247,69 @@ function Header({
     </header>
   );
 }
+type SortField = "updated" | "price" | "name" | "roast";
+
+function defaultSortDirection(field: SortField): "asc" | "desc" {
+  return field === "price" || field === "name" ? "asc" : "desc";
+}
+
+const sortLabels: Record<SortField, string> = {
+  updated: "Recently updated",
+  price: "Price",
+  name: "Name",
+  roast: "Roast date",
+};
+
+function compareBeans(
+  a: BeanRow,
+  b: BeanRow,
+  field: SortField,
+  dir: "asc" | "desc",
+): number {
+  let cmp = 0;
+  switch (field) {
+    case "price":
+      if (a.price_sgd == null && b.price_sgd == null) cmp = 0;
+      else if (a.price_sgd == null) cmp = 1;
+      else if (b.price_sgd == null) cmp = -1;
+      else cmp = a.price_sgd - b.price_sgd;
+      break;
+    case "name":
+      cmp = (a.name || "").localeCompare(b.name || "");
+      break;
+    case "roast": {
+      const aNull = a.roast_date == null;
+      const bNull = b.roast_date == null;
+      if (aNull && bNull) cmp = 0;
+      else if (aNull) cmp = 1;
+      else if (bNull) cmp = -1;
+      else cmp = a.roast_date!.localeCompare(b.roast_date!);
+      break;
+    }
+    case "updated":
+    default:
+      cmp = a.updated_at.localeCompare(b.updated_at);
+      break;
+  }
+  return dir === "asc" ? cmp : -cmp;
+}
+
 function Shelf({ data, offline }: { data: Notebook; offline: boolean }) {
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortField>("updated");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const normalizedQuery = query.trim().toLowerCase();
   const active = data.beans
-      .filter((b) => !b.deleted_at)
-      .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
-    fresh = active.filter((b) => !b.finished_at),
-    finished = active.filter((b) => b.finished_at);
+    .filter(
+      (b) =>
+        !b.deleted_at &&
+        (!normalizedQuery || b.name.toLowerCase().includes(normalizedQuery)),
+    )
+    .sort((a, b) => compareBeans(a, b, sortBy, sortDir));
+  const fresh = active.filter((b) => !b.finished_at);
+  const finished = active.filter((b) => b.finished_at);
+
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8">
       <div className="mb-6 flex items-end justify-between gap-4">
@@ -263,8 +331,63 @@ function Shelf({ data, offline }: { data: Notebook; offline: boolean }) {
           </Link>
         )}
       </div>
+
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search
+            aria-hidden
+            className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            type="search"
+            placeholder="Search beans by name..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+            aria-label="Search beans by name"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground" id="sort-label">
+            Sort by
+          </span>
+          <Select
+            value={sortBy}
+            onValueChange={(value) => {
+              const next = value as SortField;
+              setSortBy(next);
+              setSortDir(defaultSortDirection(next));
+            }}
+          >
+            <SelectTrigger aria-labelledby="sort-label" className="w-44">
+              <SelectValue>
+                {(value: SortField) => sortLabels[value]}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="updated">Recently updated</SelectItem>
+              <SelectItem value="price">Price</SelectItem>
+              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="roast">Roast date</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={sortDir === "asc" ? "Ascending" : "Descending"}
+            onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+          >
+            {sortDir === "asc" ? <ArrowUp /> : <ArrowDown />}
+          </Button>
+        </div>
+      </div>
+
       {fresh.length ? (
         <Masonry beans={fresh} data={data} />
+      ) : normalizedQuery ? (
+        <p className="text-sm text-muted-foreground">
+          No active beans match your search.
+        </p>
       ) : (
         <Empty className="border">
           <EmptyHeader>
