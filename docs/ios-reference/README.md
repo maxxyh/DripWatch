@@ -19,7 +19,7 @@ fresh visual gap worth keeping around.
 | `history-timeline.jpg` | Bean detail: history rows, icon chips + proportional pour timeline |
 | `recipe-editor-grind.jpg` | New Pourover, Recipe tab: grind picker with quick-pick chips |
 | `recipe-editor-pour-breakdown.jpg` | New Pourover, Recipe tab, scrolled: pour breakdown expanded |
-| `brewing-phase-readout.jpg` | New Pourover, Brewing tab: live stat-grid readout + stopwatch |
+| `brewing-phase-readout.jpg` | New Pourover, Brewing tab: live-edit stat grid, pour timings + stopwatch |
 | `edit-bean-top.jpg` | Edit Bean: bag photo + scan, Bean name/roaster |
 | `edit-bean-roaster-notes.jpg` | Edit Bean, scrolled: Process/Roast level chips, Roaster's Notes |
 
@@ -45,13 +45,20 @@ fresh visual gap worth keeping around.
   Stepped/Stepless tab pair), and a draggable ruler for stepless settings. `recipe-editor.tsx` and
   the new `grind-ruler.tsx`/`ui/switch.tsx` match this now; the old "Stepless grinders use the
   absolute dial…" explainer paragraph is gone (iOS never shows one).
-- **The Brewing tab's readout is a distinct big stat-grid**, not the icon-chip pills used in
+- **The Brewing tab is a legible live console, not a second planning form.** Its readout is a
+  distinct big stat-grid, not the icon-chip pills used in
   history (`RecipeReadout.swift`'s `pill()`). `brewing-phase-readout.jpg`: large bold
-  `92°  20g  1:15  300g` with small caption labels underneath, `POUR PLAN` as a section label with
-  an inline `bloom 0:45 · 3 pours · TDD 2:15` summary, then the same plain pour rows as the editor.
-  `brew-editor.tsx`'s brewing-phase "Follow the recipe" card matches this now via
-  `BrewStatGrid`/`PourPlanList` in `recipe-readout.tsx`, instead of reusing the history-style
-  `RecipeChips` pills there.
+  `92°  20g  1:15  300g` with small caption labels underneath. Temperature and final water are
+  quiet 44pt live fields; dose, ratio, and the absolute grind readout remain locked. Bloom, each
+  pour's start/end time, and cumulative water target are similarly editable in the enlarged
+  `POUR PLAN` rows. Changing final water also changes the final cumulative pour target, preserving
+  the recipe invariant. `brew-editor.tsx` matches this via `BrewStatGrid`/`PourPlanList` in
+  `recipe-readout.tsx`; its large stopwatch digits are also the direct typed-time field, rather
+  than duplicating the observation in a second input below. Read-only recipe summaries elsewhere
+  still use their existing rendering.
+- **The empty next-brew prompt belongs to the feedback loop.** On a newly added bean with no brew
+  history it remains visible for discoverability, but is disabled and says “Available after first
+  brew.” It becomes the active “Plan a change” prompt once the first brew exists.
 - **Roaster's Notes is an Enter-to-add chip input**, not a comma-separated free-text field.
   `edit-bean-roaster-notes.jpg` shows existing notes (`Apricot`, `Honey`, `Apple Tart`) as pills
   with a sparkle icon, an `Add...` field with a return-arrow icon below, and a caption
@@ -60,6 +67,15 @@ fresh visual gap worth keeping around.
   anywhere in Edit Bean — roaster notes is the only editable tasting-note surface on a bean.
   `web/src/components/bean-editor.tsx` matches this now (`TermField` for roaster notes, the
   unused flavor-tags field removed).
+- **Edit Bean is a continuous card of plain rows per section (BEAN/ORIGIN/ROAST/ROASTER'S
+  NOTES), not a form of individually bordered inputs.** Country/Region/Farm/Varietal are stacked
+  full-width rows in one card, not a 2-column grid — the same "squished" complaint and fix as the
+  Recipe tab (see above). Process and Roast level are wrapping quick-pick chips (`ChipRow`, the
+  same pattern as the grinder picker's chips) below a free-text field, not a `ToggleGroup` — the
+  old fixed-width, non-wrapping `ToggleGroup` row let its last chip ("Anaerobic") overflow off the
+  edge of the screen instead of wrapping to a new line. `bean-editor.tsx` matches this now
+  (`Section`/`PlainField`/`ChipRow`); `EditorFrame`'s page container also dropped a redundant
+  `w-[calc(100%-var(--spacing)*10)]` that was double-shrinking the content width on top of `px-4`.
 
 ## Adding more
 

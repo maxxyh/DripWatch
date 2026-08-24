@@ -52,6 +52,12 @@ Last-writer-wins is row-granular, not field-granular. Two people editing differe
 same row concurrently can still overwrite one another. Revisit this before the collaborative web
 app becomes heavily used.
 
+Bean purchase value is stored as nullable `price_sgd` and `bag_size_grams` columns. SGD is the
+only supported currency; bag size is the labeled net coffee weight. Both values must be positive
+when present, and clients derive price per gram rather than persisting a redundant calculation.
+Postgres stores price as fixed-precision `numeric(12,2)` and iOS stores integer cents locally, so
+currency values never depend on binary floating-point representation.
+
 Swift's synthesized `Encodable` calls `encodeIfPresent` for `Optional` properties, which omits
 the key entirely when the value is `nil`. PostgREST's upsert only overwrites columns present in
 the JSON body, so a field cleared back to `nil` client-side (discarding a bean's pending

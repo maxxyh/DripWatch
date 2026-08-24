@@ -39,6 +39,12 @@ export const emptyTaste = (): Taste => ({
   negatives: [],
   balance: {},
 });
+export const hasTaste = (taste: Taste) =>
+  taste.positives.length > 0 ||
+  taste.negatives.length > 0 ||
+  Object.keys(taste.balance).length > 0 ||
+  taste.rating !== undefined ||
+  !!taste.note?.trim();
 export const asPlanSeed = (recipe: Recipe): Recipe => ({
   ...recipe,
   shotTimeSec: undefined,
@@ -104,6 +110,29 @@ export function suggestedTargets(r: Recipe, count: number): number[] {
 export const ratioText = (n: number) => String(Math.round(n * 100) / 100);
 export const gramText = (n: number) =>
   Number.isInteger(n) ? String(n) : n.toFixed(1);
+export const pricePerGramSGD = (
+  priceSGD: number | null,
+  bagSizeGrams: number | null,
+) => {
+  if (
+    priceSGD === null ||
+    priceSGD <= 0 ||
+    bagSizeGrams === null ||
+    bagSizeGrams <= 0
+  )
+    return null;
+  const result = priceSGD / bagSizeGrams;
+  return Number.isFinite(result) ? result : null;
+};
+export const pricePerGramTextSGD = (price: number, locale?: string) =>
+  `S$${
+    price < 1_000
+      ? price.toFixed(2)
+      : new Intl.NumberFormat(locale, {
+          notation: "compact",
+          maximumSignificantDigits: 3,
+        }).format(price)
+  }/g`;
 export const timeText = (n: number) =>
   `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
 export function secondsFromDigits(raw: string) {

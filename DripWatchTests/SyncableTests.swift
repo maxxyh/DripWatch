@@ -32,4 +32,19 @@ struct SyncableTests {
         #expect(photo.updatedAt > Date(timeIntervalSince1970: 0))
         #expect(SyncOutbox.shared.contains(SyncRecordKey(photo)))
     }
+
+    @Test func disabledFixtureOutboxNeverPersistsMutations() throws {
+        let suiteName = "SyncableTests.fixture.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let outbox = SyncOutbox(
+            defaults: defaults,
+            storageKey: "fixture-outbox",
+            isRecordingEnabled: false
+        )
+
+        #expect(outbox.record(SyncRecordKey(Bean())) == 0)
+        #expect(outbox.isEmpty)
+        #expect(defaults.data(forKey: "fixture-outbox") == nil)
+    }
 }

@@ -21,4 +21,9 @@ struct TasteTests {
         var t = Taste(); t.note = ""
         #expect(t.isEmpty)
     }
+
+    @Test func whitespaceOnlyNoteDoesNotCount() {
+        var t = Taste(); t.note = "  \n "
+        #expect(t.isEmpty)
+    }
 }

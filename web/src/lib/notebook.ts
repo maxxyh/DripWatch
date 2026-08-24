@@ -67,6 +67,8 @@ const allowedColumns: Record<Table, Set<string>> = {
     "roast_level",
     "roast_date",
     "roaster_notes",
+    "price_sgd",
+    "bag_size_grams",
     "my_flavor_tags",
     "finished_at",
     "pending_next_pourover",

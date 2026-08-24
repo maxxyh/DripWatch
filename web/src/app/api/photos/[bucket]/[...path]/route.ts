@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { isSameOrigin, requireSession } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { validateNormalizedJpeg, MAX_PHOTO_DIMENSION } from "@/lib/photo-validation";
+import { requireSafeMutationTarget } from "@/lib/mutation-target";
 const allowed = new Set(["bean-photos", "brew-photos"]);
 const canonicalPath =
   /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{64})\.jpg$/;
@@ -121,6 +122,7 @@ export async function PUT(
     if (!isSameOrigin(request))
       return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
     await requireSession();
+    requireSafeMutationTarget();
     const { bucket, path } = await params;
     if (!allowed.has(bucket)) return new NextResponse(null, { status: 404 });
     const relativePath = path.join("/");
@@ -171,7 +173,9 @@ export async function PUT(
         status:
           error instanceof Error && error.message === "UNAUTHORIZED"
             ? 401
-            : 500,
+            : error instanceof Error && error.message === "REMOTE_DEV_WRITES_DISABLED"
+              ? 403
+              : 500,
       },
     );
   }

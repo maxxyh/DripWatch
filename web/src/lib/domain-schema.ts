@@ -70,6 +70,8 @@ export const beanSchema = z.object({
   roast_level: z.string().nullable(),
   roast_date: timestamp.nullable(),
   roaster_notes: z.string().nullable(),
+  price_sgd: z.number().positive().nullable(),
+  bag_size_grams: z.number().positive().nullable(),
   my_flavor_tags: z.array(z.string()),
   finished_at: timestamp.nullable(),
   pending_next_pourover: recipeSchema.nullable(),

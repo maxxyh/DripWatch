@@ -1,9 +1,17 @@
+import Foundation
 import Testing
 @testable import DripWatch
 
 /// Exercises the per-method seeding/pending logic on standalone model objects (no
 /// ModelContainer needed — these paths only touch stored properties and the `brews` array).
 struct BeanSeedTests {
+
+    @Test func sampleModeRequiresTheExplicitLaunchArgumentValue() {
+        #expect(SampleData.isRequested(arguments: ["DripWatch", "-seedSampleData", "1"]))
+        #expect(!SampleData.isRequested(arguments: ["DripWatch", "-seedSampleData", "0"]))
+        #expect(!SampleData.isRequested(arguments: ["DripWatch", "-seedSampleData"]))
+        #expect(!SampleData.isRequested(arguments: ["DripWatch"]))
+    }
 
     @Test func seedFallsBackToLastBrewThenPending() {
         let bean = Bean(name: "Test")
@@ -54,5 +62,34 @@ struct BeanSeedTests {
         brew.deletedAt = .now
         #expect(bean.brewCount == 0)
         #expect(bean.lastBrew(for: .pourover) == nil)
+    }
+
+    @Test func purchaseValueUsesExactCentsAndLocaleSafeInput() {
+        let bean = Bean(name: "Test")
+        bean.priceSGDCents = 3_650
+        bean.bagSizeGrams = 250
+        #expect(bean.priceSGD == 36.5)
+        #expect(bean.pricePerGramSGD == 0.146)
+
+        bean.bagSizeGrams = nil
+        #expect(bean.pricePerGramSGD == nil)
+
+        let singapore = Locale(identifier: "en_SG")
+        #expect(PurchaseValue.editingText(1_000, maxFractionDigits: 2, locale: singapore) == "1000")
+        #expect(PurchaseValue.positiveNumber("1,000", locale: singapore) == 1_000)
+        #expect(PurchaseValue.priceCents("36.50", locale: singapore) == 3_650)
+        #expect(PurchaseValue.priceCents("36.501", locale: singapore) == nil)
+        #expect(PurchaseValue.priceCents("9999999999.99", locale: singapore) == PurchaseValue.maximumPriceCents)
+        #expect(PurchaseValue.priceCents("10000000000.00", locale: singapore) == nil)
+        #expect(PurchaseValue.priceCents("999999999999999999999999", locale: singapore) == nil)
+
+        let german = Locale(identifier: "de_DE")
+        #expect(PurchaseValue.positiveNumber("1.000,5", locale: german) == 1_000.5)
+        #expect(PurchaseValue.priceCents("36,50", locale: german) == 3_650)
+        #expect(PurchaseValue.positiveNumber("32..00", locale: singapore) == nil)
+
+        bean.priceSGDCents = PurchaseValue.maximumPriceCents
+        bean.bagSizeGrams = .leastNonzeroMagnitude
+        #expect(bean.pricePerGramSGD == nil)
     }
 }

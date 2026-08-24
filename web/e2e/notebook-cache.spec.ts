@@ -15,6 +15,8 @@ const bean = (name: string) => ({
   roast_level: null,
   roast_date: null,
   roaster_notes: null,
+  price_sgd: null,
+  bag_size_grams: null,
   my_flavor_tags: [],
   finished_at: null,
   pending_next_pourover: null,

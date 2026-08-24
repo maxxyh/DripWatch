@@ -71,6 +71,8 @@ npm run test:e2e
 
 DEBUG launch arguments: `-seedSampleData 1`, `-openFirstBean 1`, `-openEspressoBean 1`,
 `-openBrewSheet 1`, and `-scrollToHistory 1`.
+`-seedSampleData 1` always uses an in-memory store with remote sync disabled; simulator fixtures
+must never be created in the persistent store or uploaded to the hosted project.
 
 The hosted test bundle can hang/crash when a SwiftData `ModelContainer` is created inside it;
 keep pure model-logic tests container-free and wire standalone relationships directly. For sync

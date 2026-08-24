@@ -30,17 +30,25 @@ final class SyncOutbox {
         var entries: [Entry] = []
     }
 
-    static let shared = SyncOutbox()
+    /// Fixture launches must not persist UUIDs from their in-memory store into the production
+    /// journal. `markDirty()` always targets this shared outbox, so isolation belongs here too.
+    static let shared = SyncOutbox(isRecordingEnabled: !SampleData.isRequested)
 
     private let defaults: UserDefaults
     private let storageKey: String
+    private let isRecordingEnabled: Bool
     private var nextGeneration: UInt64
     private var pending: [SyncRecordKey: UInt64]
     var onRecord: (() -> Void)?
 
-    init(defaults: UserDefaults = .standard, storageKey: String = "dripwatch.sync.outbox.v1") {
+    init(
+        defaults: UserDefaults = .standard,
+        storageKey: String = "dripwatch.sync.outbox.v1",
+        isRecordingEnabled: Bool = true
+    ) {
         self.defaults = defaults
         self.storageKey = storageKey
+        self.isRecordingEnabled = isRecordingEnabled
 
         if let data = defaults.data(forKey: storageKey),
            let state = try? JSONDecoder().decode(PersistedState.self, from: data) {
@@ -57,6 +65,7 @@ final class SyncOutbox {
 
     @discardableResult
     func record(_ key: SyncRecordKey) -> UInt64 {
+        guard isRecordingEnabled else { return 0 }
         let generation = nextGeneration
         nextGeneration &+= 1
         if nextGeneration == 0 { nextGeneration = 1 }

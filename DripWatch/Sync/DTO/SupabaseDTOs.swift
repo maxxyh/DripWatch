@@ -23,6 +23,8 @@ struct BeanDTO: SupabaseRow {
     var roastLevel: String?
     var roastDate: Date?
     var roasterNotes: String?
+    var priceSGD: Decimal?
+    var bagSizeGrams: Double?
     var myFlavorTags: [String]
     var finishedAt: Date?
     var pendingNextPourover: Recipe?
@@ -37,6 +39,8 @@ struct BeanDTO: SupabaseRow {
         case roastLevel = "roast_level"
         case roastDate = "roast_date"
         case roasterNotes = "roaster_notes"
+        case priceSGD = "price_sgd"
+        case bagSizeGrams = "bag_size_grams"
         case myFlavorTags = "my_flavor_tags"
         case finishedAt = "finished_at"
         case pendingNextPourover = "pending_next_pourover"
@@ -58,6 +62,8 @@ struct BeanDTO: SupabaseRow {
         roastLevel = bean.roastLevel
         roastDate = bean.roastDate
         roasterNotes = bean.roasterNotes
+        priceSGD = bean.priceSGDCents.map { Decimal($0) / 100 }
+        bagSizeGrams = bean.bagSizeGrams
         myFlavorTags = bean.myFlavorTags
         finishedAt = bean.finishedAt
         pendingNextPourover = bean.pendingNextPourover
@@ -85,6 +91,8 @@ struct BeanDTO: SupabaseRow {
         bean.roastLevel = roastLevel
         bean.roastDate = roastDate
         bean.roasterNotes = roasterNotes
+        bean.priceSGDCents = priceSGD.map { NSDecimalNumber(decimal: $0 * 100).intValue }
+        bean.bagSizeGrams = bagSizeGrams
         bean.myFlavorTags = myFlavorTags
         bean.finishedAt = finishedAt
         bean.pendingNextPourover = pendingNextPourover
@@ -113,6 +121,8 @@ struct BeanDTO: SupabaseRow {
         try container.encode(roastLevel, forKey: .roastLevel)
         try container.encode(roastDate, forKey: .roastDate)
         try container.encode(roasterNotes, forKey: .roasterNotes)
+        try container.encode(priceSGD, forKey: .priceSGD)
+        try container.encode(bagSizeGrams, forKey: .bagSizeGrams)
         try container.encode(myFlavorTags, forKey: .myFlavorTags)
         try container.encode(finishedAt, forKey: .finishedAt)
         try container.encode(pendingNextPourover, forKey: .pendingNextPourover)

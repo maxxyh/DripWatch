@@ -22,6 +22,10 @@ final class Bean: Syncable {
     var roastLevel: String?
     var roastDate: Date?
     var roasterNotes: String?
+    /// Purchase facts use one intentionally fixed currency (SGD). Bag size is the labeled net
+    /// coffee weight in grams; together they make the value comparison visible on the card.
+    var priceSGDCents: Int?
+    var bagSizeGrams: Double?
     var myFlavorTags: [String] = []
 
     /// Set when the bag's used up. A finished bean drops off the top of the shelf into a separate
@@ -96,6 +100,14 @@ final class Bean: Syncable {
     var brewCount: Int { timeline.count }
     var lastBrew: Brew? { timeline.first }
     var isFinished: Bool { finishedAt != nil }
+
+    var pricePerGramSGD: Double? {
+        guard let priceSGDCents, priceSGDCents > 0, let bagSizeGrams, bagSizeGrams > 0 else { return nil }
+        let result = Double(priceSGDCents) / 100 / bagSizeGrams
+        return result.isFinite ? result : nil
+    }
+
+    var priceSGD: Double? { priceSGDCents.map { Double($0) / 100 } }
 
     /// A friendly label for the "brews together" chip.
     var togetherLabel: String {

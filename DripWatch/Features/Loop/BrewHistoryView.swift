@@ -7,6 +7,7 @@ import SwiftData
 struct BrewHistoryView: View {
     let brews: [Brew]   // newest first
     var onEdit: (Brew) -> Void = { _ in }
+    var onAddTaste: (Brew) -> Void = { _ in }
     var onDelete: (Brew) -> Void = { _ in }
     var onTapPhoto: (Data) -> Void = { _ in }
 
@@ -15,7 +16,13 @@ struct BrewHistoryView: View {
             ForEach(Array(brews.enumerated()), id: \.element.id) { index, brew in
                 // The previous brew chronologically is the next one in this newest-first list.
                 let previous = index + 1 < brews.count ? brews[index + 1] : nil
-                BrewRow(brew: brew, previous: previous, onEdit: { onEdit(brew) }, onDelete: { onDelete(brew) }, onTapPhoto: onTapPhoto)
+                BrewRow(brew: brew,
+                        previous: previous,
+                        showsTasteSuggestion: index == 0 && brew.taste.isEmpty,
+                        onEdit: { onEdit(brew) },
+                        onAddTaste: { onAddTaste(brew) },
+                        onDelete: { onDelete(brew) },
+                        onTapPhoto: onTapPhoto)
                     .contextMenu {
                         Button { onEdit(brew) } label: { Label("Edit brew", systemImage: "pencil") }
                         Button { copyBrew(brew) } label: { Label("Copy as text", systemImage: "doc.on.doc") }
@@ -38,7 +45,9 @@ func copyBrew(_ brew: Brew) {
 struct BrewRow: View {
     let brew: Brew
     var previous: Brew?
+    var showsTasteSuggestion = false
     var onEdit: () -> Void = {}
+    var onAddTaste: () -> Void = {}
     var onDelete: () -> Void = {}
     var onTapPhoto: (Data) -> Void = { _ in }
 
@@ -84,6 +93,28 @@ struct BrewRow: View {
 
             // The full absolute recipe.
             RecipeReadout(recipe: brew.recipe)
+
+            if showsTasteSuggestion {
+                Button {
+                    Haptics.tap()
+                    onAddTaste()
+                } label: {
+                    Label("Add tasting notes?", systemImage: "slider.horizontal.3")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Theme.accent.opacity(0.85))
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 7)
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(Theme.accent.opacity(0.45),
+                                              style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        )
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens this brew's Taste step")
+            }
 
             // Optional result photo (latte art, crema) — tap to view full-screen.
             if let data = brew.photo, let ui = UIImage(data: data) {

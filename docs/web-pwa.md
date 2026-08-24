@@ -84,6 +84,12 @@ recoverable but not transactionally atomic through PostgREST. Bean and brew phot
 in the browser and guarded by canonical, record-linked proxy paths. Replacement objects may remain
 orphaned after a later stale-write conflict and must not be deleted speculatively.
 
+When no plan exists, bean detail keeps a quiet “Next brew / Plan a change” entry below the brew
+buttons; it opens the existing full recipe planner, seeded from the newest brew (or the default
+pourover recipe when history is empty). The newest history card alone shows a dashed “Add tasting
+notes?” suggestion when its taste is completely empty, linking directly to that brew's Taste tab.
+Older untasted brews are intentionally left unprompted.
+
 Once a brew is started, its date, recipe, observed time, taste, and photo reference autosave with
 stale-write guards. Planning from the newest brew updates the bean's single active pending plan;
 the legacy per-brew `next_recipe_draft` field is no longer used by the PWA. Brewing mode retains
@@ -94,7 +100,9 @@ the same persisted pour rows rather than regenerating them.
 Bean edits use the same term normalization as iOS: fact fields are title-cased while digit-bearing
 codes and short uppercase acronyms keep their spelling, comma lists are case-insensitively deduped,
 and roaster brand casing is preserved. Saved and newly selected bag photos share one ordered draft,
-so the hero order is visible before save. `RecipeEditor` also remembers newly typed grinders and
+so the hero order is visible before save. The bean editor also captures optional SGD price and
+labeled bag size in grams; shelf cards and bean detail derive and show the SGD-per-gram value for
+quick comparison, matching iOS. Both editors offer 100 g, 200 g, and 250 g bag-size shortcuts. `RecipeEditor` also remembers newly typed grinders and
 their stepped/stepless classification through the guarded mutation API. Numeric recipe controls
 use iOS-style decrement/increment buttons and mobile numeric keypads; signed controls retain
 negative entry. Observed drawdown and shot time use the native digit-entry convention, so `230`
@@ -102,6 +110,12 @@ becomes `2:30` while the stopwatch remains available. While tasting, "Previous n
 `BrewCaptureView.swift`'s `PreviousNotesView`: the last few brews' terms are grouped one card per
 brewed date (collapsed to the most recent, "Show N more" reveals the rest) and keep positive/negative
 coloring, rather than one undifferentiated flat list of chips.
+
+Local development is read-only when `SUPABASE_URL` points to a hosted project. Mutation and photo
+upload routes return `403` unless Supabase is local or `ALLOW_REMOTE_DEV_MUTATIONS=1` is explicitly
+set. The canonical Vercel production deployment is also allowed (`VERCEL_ENV=production`), while
+local production-mode servers and preview deployments remain guarded. Visual verification should
+keep the guard enabled; remote opt-in is reserved for deliberate manual data work.
 
 Photo uploads are also decoded at the server boundary and rejected unless they are valid JPEGs
 whose width and height are both at most 1400 pixels. On the read side, `/api/photos/[bucket]/...`

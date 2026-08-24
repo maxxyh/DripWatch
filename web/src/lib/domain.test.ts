@@ -4,9 +4,12 @@ import {
   brewDiff,
   effectiveWater,
   grindDisplay,
+  hasTaste,
   newPourover,
   normalizeTerm,
   normalizeTerms,
+  pricePerGramSGD,
+  pricePerGramTextSGD,
   reconcileWater,
   liveTimeEntry,
   secondsFromDigits,
@@ -62,6 +65,33 @@ describe("Swift recipe parity", () => {
       doseGrams: 18,
     }));
 });
+
+describe("hasTaste", () => {
+  it("treats the untouched taste shape as empty", () => {
+    expect(hasTaste({ positives: [], negatives: [], balance: {} })).toBe(false);
+  });
+
+  it("recognizes each persisted kind of tasting input", () => {
+    expect(
+      hasTaste({ positives: ["Sweet"], negatives: [], balance: {} }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: ["Dry"], balance: {} }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: [], balance: { body: 3 } }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: [], balance: {}, rating: 4 }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: [], balance: {}, note: "Juicy" }),
+    ).toBe(true);
+    expect(
+      hasTaste({ positives: [], negatives: [], balance: {}, note: "   " }),
+    ).toBe(false);
+  });
+});
 describe("instrument formatting and diffs", () => {
   it("shows absolute signed grind", () =>
     expect(
@@ -99,6 +129,15 @@ describe("instrument formatting and diffs", () => {
   });
 });
 describe("native input behavior", () => {
+  it("derives SGD per gram only from positive complete purchase values", () => {
+    expect(pricePerGramSGD(36.5, 250)).toBeCloseTo(0.146);
+    expect(pricePerGramSGD(null, 250)).toBeNull();
+    expect(pricePerGramSGD(36.5, null)).toBeNull();
+    expect(pricePerGramSGD(0, 250)).toBeNull();
+    expect(pricePerGramSGD(Number.MAX_VALUE, Number.MIN_VALUE)).toBeNull();
+    expect(pricePerGramTextSGD(0.146)).toBe("S$0.15/g");
+    expect(pricePerGramTextSGD(1_250, "en-SG")).toBe("S$1.25K/g");
+  });
   it("treats the last two digits as seconds", () => {
     expect(secondsFromDigits("45")).toBe(45);
     expect(secondsFromDigits("230")).toBe(150);
