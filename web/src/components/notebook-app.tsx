@@ -54,6 +54,7 @@ const BeanDetail = dynamic(() => import("./bean-detail"));
 
 const SNAPSHOT = "dripwatch-notebook-v1";
 const SESSION_LEASE = "dripwatch-session-lease";
+const SHELF_FILTERS = "dripwatch-shelf-filters-v1";
 function readCachedSnapshot(): Notebook | null {
   try {
     const cached = localStorage.getItem(SNAPSHOT);
@@ -190,6 +191,7 @@ function Header({
     } finally {
       localStorage.removeItem(SNAPSHOT);
       localStorage.removeItem(SESSION_LEASE);
+      localStorage.removeItem(SHELF_FILTERS);
       if ("caches" in window)
         for (const key of await caches.keys())
           if (key.startsWith("dripwatch-protected")) await caches.delete(key);
@@ -269,6 +271,27 @@ const methodLabels: Record<MethodFilter, string> = {
   espresso: "Espresso",
 };
 
+function parseMethodFilter(value: string | null): MethodFilter {
+  if (value === "pourover" || value === "espresso" || value === "all")
+    return value;
+  return "all";
+}
+
+function parseSortField(value: string | null): SortField {
+  if (
+    value === "updated" ||
+    value === "price" ||
+    value === "name" ||
+    value === "roast"
+  )
+    return value;
+  return "updated";
+}
+
+function parseSortDir(value: string | null): "asc" | "desc" {
+  return value === "asc" ? "asc" : "desc";
+}
+
 function compareBeans(
   a: BeanRow,
   b: BeanRow,
@@ -303,11 +326,46 @@ function compareBeans(
   return dir === "asc" ? cmp : -cmp;
 }
 
+type ShelfFilters = {
+  q: string;
+  sort: SortField;
+  dir: "asc" | "desc";
+  method: MethodFilter;
+};
+
+function readShelfFilters(): Partial<ShelfFilters> {
+  try {
+    const raw = localStorage.getItem(SHELF_FILTERS);
+    return raw ? (JSON.parse(raw) as Partial<ShelfFilters>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeShelfFilters(filters: Partial<ShelfFilters>) {
+  try {
+    localStorage.setItem(SHELF_FILTERS, JSON.stringify(filters));
+  } catch {
+    // Storage may be unavailable or full; filters are non-critical.
+  }
+}
+
 function Shelf({ data, offline }: { data: Notebook; offline: boolean }) {
-  const [query, setQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortField>("updated");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [methodFilter, setMethodFilter] = useState<MethodFilter>("all");
+  const stored = readShelfFilters();
+  const [query, setQuery] = useState(stored.q ?? "");
+  const [sortBy, setSortBy] = useState<SortField>(
+    parseSortField(stored.sort ?? null),
+  );
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(
+    parseSortDir(stored.dir ?? null),
+  );
+  const [methodFilter, setMethodFilter] = useState<MethodFilter>(
+    parseMethodFilter(stored.method ?? null),
+  );
+
+  useEffect(() => {
+    writeShelfFilters({ q: query, sort: sortBy, dir: sortDir, method: methodFilter });
+  }, [query, sortBy, sortDir, methodFilter]);
 
   const normalizedQuery = query.trim().toLowerCase();
   const active = data.beans
