@@ -3,6 +3,11 @@ import Testing
 
 struct NormalizationTests {
 
+    @Test func grinderIdentityIgnoresCaseAndOuterWhitespace() {
+        #expect("  1ZPresso J ".grinderIdentityKey == "1zpresso j")
+        #expect("1ZPresso J".grinderIdentityKey == "1Zpresso J".grinderIdentityKey)
+    }
+
     @Test func titleCasesPlainWords() {
         #expect("sugarcane".normalizedTerm == "Sugarcane")
         #expect("juicy grape".normalizedTerm == "Juicy Grape")

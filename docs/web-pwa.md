@@ -102,8 +102,10 @@ codes and short uppercase acronyms keep their spelling, comma lists are case-ins
 and roaster brand casing is preserved. Saved and newly selected bag photos share one ordered draft,
 so the hero order is visible before save. The bean editor also captures optional SGD price and
 labeled bag size in grams; shelf cards and bean detail derive and show the SGD-per-gram value for
-quick comparison, matching iOS. Both editors offer 100 g, 200 g, and 250 g bag-size shortcuts. `RecipeEditor` also remembers newly typed grinders and
-their stepped/stepless classification through the guarded mutation API. Numeric recipe controls
+quick comparison, matching iOS. Both editors offer 100 g, 200 g, and 250 g bag-size shortcuts.
+`RecipeEditor` also remembers newly typed grinders and their stepped/stepless classification
+through the guarded mutation API. Grinder identity ignores outer whitespace and case, so casing
+variants reuse the oldest saved display spelling rather than creating another chip. Numeric recipe controls
 use iOS-style decrement/increment buttons and mobile numeric keypads; signed controls retain
 negative entry. Observed drawdown and shot time use the native digit-entry convention, so `230`
 becomes `2:30` while the stopwatch remains available. Time inputs place the caret at the end when

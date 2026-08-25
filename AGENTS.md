@@ -19,6 +19,8 @@ needed. Keep this file concise; put durable topic detail in `docs/<topic>.md` an
 - One reusable `RecipeEditor`; a brew owns its recipe, while a bean has at most one active
   planned-next-brew draft across both methods.
 - Grind is absolute and reproducible: `grinder · dial(±clicks)`. Deltas are annotations only.
+- Grinder registry identity is case-insensitive and trimmed; preserve the oldest display spelling
+  and soft-delete duplicates rather than hard-deleting synced rows.
 - Pour timing has two canonical starts: pour one is always `0:00`; pour two starts when bloom ends,
   with `bloomTimeSec` as their shared synced value.
 - Structured but progressive: everyday recipe line first, detail only when requested.

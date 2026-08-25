@@ -2,6 +2,7 @@ import type {
   BeanRow,
   BrewRow,
   GrindSetting,
+  GrinderRow,
   Recipe,
   Taste,
 } from "./domain-schema";
@@ -27,6 +28,18 @@ export function photoUrl(
     : null;
 }
 export const emptyRecipe = (): Recipe => ({ pours: [] });
+export const grinderIdentityKey = (name: string) =>
+  name.trim().toLocaleLowerCase("en-US");
+export function dedupeGrinders(grinders: GrinderRow[]): GrinderRow[] {
+  const byIdentity = new Map<string, GrinderRow>();
+  for (const grinder of grinders.filter((candidate) => candidate.deleted_at === null)) {
+    const key = grinderIdentityKey(grinder.name);
+    const existing = byIdentity.get(key);
+    if (!existing || grinder.created_at < existing.created_at)
+      byIdentity.set(key, grinder);
+  }
+  return [...byIdentity.values()];
+}
 export const newPourover = (): Recipe => ({
   pours: [],
   waterTempC: 92,

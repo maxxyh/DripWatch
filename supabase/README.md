@@ -14,6 +14,10 @@ shares the notebook and can select, insert, and update rows and photo objects.
 There is no hard-delete grant. Add authenticated ownership rules before using
 this schema for more than one user.
 
+Active grinder names are unique by `lower(btrim(name))`. The grinder-deduplication migration
+soft-deletes later case/whitespace duplicates, preserves the oldest display spelling, and retains
+a stepless classification recorded on any duplicate. Recipe JSON keeps its historical spelling.
+
 ## App configuration
 
 After creating the hosted project and applying the schema, copy the local-only

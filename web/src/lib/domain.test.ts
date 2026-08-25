@@ -5,6 +5,8 @@ import {
   canonicalizePourTimings,
   effectiveWater,
   grindDisplay,
+  grinderIdentityKey,
+  dedupeGrinders,
   hasTaste,
   newPourover,
   normalizeTerm,
@@ -154,6 +156,25 @@ describe("hasTaste", () => {
   });
 });
 describe("instrument formatting and diffs", () => {
+  it("deduplicates grinder identity without changing display casing", () => {
+    const first = {
+      id: crypto.randomUUID(),
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      deleted_at: null,
+      name: "1Zpresso J",
+      stepless: false,
+    };
+    const duplicate = {
+      ...first,
+      id: crypto.randomUUID(),
+      created_at: "2026-02-01T00:00:00.000Z",
+      name: "1ZPresso J",
+    };
+
+    expect(grinderIdentityKey(" 1ZPresso J ")).toBe("1zpresso j");
+    expect(dedupeGrinders([duplicate, first])).toEqual([first]);
+  });
   it("shows absolute signed grind", () =>
     expect(
       grindDisplay({ grinderName: "1Zpresso J", major: 3, clickOffset: -1 }),

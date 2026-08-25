@@ -54,6 +54,10 @@ create table if not exists public.grinders (
     stepless boolean not null default false
 );
 
+create unique index if not exists grinders_active_name_unique
+    on public.grinders (lower(btrim(name)))
+    where deleted_at is null and btrim(name) <> '';
+
 create table if not exists public.lexicon_terms (
     id uuid primary key,
     created_at timestamptz not null default now(),

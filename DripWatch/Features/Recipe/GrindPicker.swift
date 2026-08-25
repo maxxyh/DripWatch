@@ -17,7 +17,7 @@ struct GrindPicker: View {
         return grinders
             .filter { $0.deletedAt == nil && !$0.name.isEmpty }
             .map(\.name)
-            .filter { seen.insert($0).inserted }
+            .filter { seen.insert($0.grinderIdentityKey).inserted }
     }
 
     var body: some View {
@@ -184,7 +184,8 @@ struct GrindPicker: View {
     /// Whether the currently-selected grinder is a stepless machine (looked up by name).
     private var currentStepless: Bool {
         guard let name = grind?.grinderName else { return false }
-        return grinders.first { $0.deletedAt == nil && $0.name == name }?.stepless ?? false
+        let key = name.grinderIdentityKey
+        return grinders.first { $0.deletedAt == nil && $0.name.grinderIdentityKey == key }?.stepless ?? false
     }
 
     /// Record a grinder's kind (stepless or stepped) so the right input shows next time. Forcing
@@ -192,7 +193,9 @@ struct GrindPicker: View {
     private func setStepless(_ value: Bool) {
         guard let raw = grind?.grinderName, let name = raw.nilIfBlank else { return }
         Haptics.select()
-        if let existing = grinders.first(where: { $0.deletedAt == nil && $0.name == name }) {
+        let key = name.grinderIdentityKey
+        if let existing = grinders.first(where: { $0.deletedAt == nil && $0.name.grinderIdentityKey == key }) {
+            grind?.grinderName = existing.name
             existing.stepless = value
             existing.markDirty()
         } else {
@@ -211,7 +214,8 @@ struct GrindPicker: View {
         } else {
             grind?.grinderName = name
         }
-        if grinders.first(where: { $0.deletedAt == nil && $0.name == name })?.stepless == true {
+        let key = name.grinderIdentityKey
+        if grinders.first(where: { $0.deletedAt == nil && $0.name.grinderIdentityKey == key })?.stepless == true {
             grind?.clickOffset = 0
         }
         lastGrinder = name
@@ -222,7 +226,12 @@ struct GrindPicker: View {
     private func saveGrinder(_ rawName: String) {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        guard !grinders.contains(where: { $0.deletedAt == nil && $0.name == name }) else { return }
+        let key = name.grinderIdentityKey
+        if let existing = grinders.first(where: { $0.deletedAt == nil && $0.name.grinderIdentityKey == key }) {
+            grind?.grinderName = existing.name
+            lastGrinder = existing.name
+            return
+        }
         let grinder = Grinder(name: name)
         context.insert(grinder)
         grinder.markDirty()

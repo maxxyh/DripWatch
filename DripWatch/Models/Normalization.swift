@@ -2,6 +2,13 @@ import Foundation
 import SwiftData
 
 extension String {
+    /// Stable identity for grinder registry matching. Display spelling stays untouched, while
+    /// outer whitespace and case cannot create a second logical grinder.
+    var grinderIdentityKey: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(with: Locale(identifier: "en_US_POSIX"))
+    }
+
     /// Title-case for display consistency, preserving codes and acronyms so coffee terms survive:
     /// any token containing a digit (SL-34, THA1, S795, USDA 762) or a short all-caps acronym
     /// (SL, USDA) keeps its case; everything else is Title Cased. Applied to bean facts and tasting

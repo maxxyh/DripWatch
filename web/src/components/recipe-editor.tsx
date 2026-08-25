@@ -45,7 +45,9 @@ import { TimeInput } from "./time-input";
 import type { GrinderRow, Recipe } from "@/lib/domain";
 import {
   canonicalizePourTimings,
+  dedupeGrinders,
   effectiveWater,
+  grinderIdentityKey,
   reconcileWater,
   setTotalWater,
   setBloomTime,
@@ -126,25 +128,23 @@ export function RecipeEditor({
   const [showTimes, setShowTimes] = useState(() =>
     recipe.pours.some((pour) => pour.startSec !== undefined || pour.endSec !== undefined),
   );
-  const knownGrinders = [...savedGrinders, ...grinders].filter(
-    (grinder, index, rows) =>
-      rows.findIndex((candidate) => candidate.id === grinder.id) === index,
-  );
+  const knownGrinders = dedupeGrinders([...savedGrinders, ...grinders]);
   const grinderRows = useRef(knownGrinders);
   const pendingGrinderSaves = useRef(new Map<string, Promise<GrinderRow>>());
   const set = <K extends keyof Recipe>(key: K, value: Recipe[K]) =>
     onChange({ ...recipe, [key]: value });
   const selectedGrinder = knownGrinders.find(
-    (grinder) => grinder.name === recipe.grinderName,
+    (grinder) => grinderIdentityKey(grinder.name) === grinderIdentityKey(recipe.grinderName ?? ""),
   );
   async function persistGrinder(rawName: string, stepless: boolean) {
     const name = rawName.trim();
     if (!name) return;
-    const previous = pendingGrinderSaves.current.get(name);
+    const identity = grinderIdentityKey(name);
+    const previous = pendingGrinderSaves.current.get(identity);
     const operation = (previous ?? Promise.resolve(undefined)).then(
       async () => {
         const existing = grinderRows.current.find(
-          (grinder) => grinder.name === name,
+          (grinder) => grinderIdentityKey(grinder.name) === identity,
         );
         if (existing?.stepless === stepless) return existing;
         const now = new Date().toISOString();
@@ -173,7 +173,7 @@ export function RecipeEditor({
         return saved;
       },
     );
-    pendingGrinderSaves.current.set(name, operation);
+    pendingGrinderSaves.current.set(identity, operation);
     try {
       await operation;
     } catch (error) {
@@ -181,8 +181,8 @@ export function RecipeEditor({
         error instanceof Error ? error.message : "Could not save grinder",
       );
     } finally {
-      if (pendingGrinderSaves.current.get(name) === operation)
-        pendingGrinderSaves.current.delete(name);
+      if (pendingGrinderSaves.current.get(identity) === operation)
+        pendingGrinderSaves.current.delete(identity);
     }
   }
   function selectGrinder(grinder: GrinderRow) {
@@ -248,7 +248,7 @@ export function RecipeEditor({
               {knownGrinders.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {knownGrinders.map((g) => {
-                    const active = recipe.grinderName === g.name;
+                    const active = grinderIdentityKey(recipe.grinderName ?? "") === grinderIdentityKey(g.name);
                     return (
                       <button
                         key={g.id}
@@ -275,7 +275,7 @@ export function RecipeEditor({
                 onChange={(e) => {
                   const name = e.target.value || undefined;
                   const grinder = knownGrinders.find(
-                    (item) => item.name === name,
+                    (item) => grinderIdentityKey(item.name) === grinderIdentityKey(name ?? ""),
                   );
                   onChange({
                     ...recipe,
@@ -287,12 +287,17 @@ export function RecipeEditor({
                 }}
                 onBlur={() => {
                   const name = recipe.grinderName?.trim();
-                  if (name)
+                  if (name) {
+                    const existing = knownGrinders.find(
+                      (item) => grinderIdentityKey(item.name) === grinderIdentityKey(name),
+                    );
+                    if (existing && existing.name !== name)
+                      onChange({ ...recipe, grinderName: existing.name });
                     void persistGrinder(
                       name,
-                      knownGrinders.find((item) => item.name === name)
-                        ?.stepless ?? false,
+                      existing?.stepless ?? false,
                     );
+                  }
                 }}
                 placeholder="1Zpresso J"
               />
