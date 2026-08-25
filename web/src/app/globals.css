@@ -53,6 +53,7 @@
 :root {
   --background: #fafafa;
   --foreground: oklch(0.145 0 0);
+  --primary-foreground: oklch(0.145 0 0);
   --card: #ffffff;
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -90,6 +91,7 @@
 .dark {
   --background: #09090b;
   --foreground: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.985 0 0);
   --card: #18181b;
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
