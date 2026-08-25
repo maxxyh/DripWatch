@@ -66,7 +66,7 @@ struct BeanDTO: SupabaseRow {
         bagSizeGrams = bean.bagSizeGrams
         myFlavorTags = bean.myFlavorTags
         finishedAt = bean.finishedAt
-        pendingNextPourover = bean.pendingNextPourover
+        pendingNextPourover = bean.pendingNextPourover?.canonicalizedPourTimings
         pendingNextEspresso = bean.pendingNextEspresso
     }
 
@@ -95,7 +95,7 @@ struct BeanDTO: SupabaseRow {
         bean.bagSizeGrams = bagSizeGrams
         bean.myFlavorTags = myFlavorTags
         bean.finishedAt = finishedAt
-        bean.pendingNextPourover = pendingNextPourover
+        bean.pendingNextPourover = pendingNextPourover?.canonicalizedPourTimings
         bean.pendingNextEspresso = pendingNextEspresso
     }
 
@@ -166,9 +166,9 @@ struct BrewDTO: SupabaseRow {
         brewedAt = brew.brewedAt
         methodRaw = brew.methodRaw
         brewers = brew.brewers
-        recipe = brew.recipe
+        recipe = brew.recipe.canonicalizedPourTimings
         taste = brew.taste
-        nextRecipeDraft = brew.nextRecipeDraft
+        nextRecipeDraft = brew.nextRecipeDraft?.canonicalizedPourTimings
         beanID = brew.bean?.id
         photoPath = brew.photoRemotePath
     }
@@ -192,9 +192,9 @@ struct BrewDTO: SupabaseRow {
         brew.brewedAt = brewedAt
         brew.methodRaw = methodRaw
         brew.brewers = brewers
-        brew.recipe = recipe
+        brew.recipe = recipe.canonicalizedPourTimings
         brew.taste = taste
-        brew.nextRecipeDraft = nextRecipeDraft
+        brew.nextRecipeDraft = nextRecipeDraft?.canonicalizedPourTimings
         brew.photoRemotePath = photoPath
     }
 

@@ -54,6 +54,7 @@ struct RecipeEditor: View {
         let totalChanged = !firstLayout && newTotal != syncedWaterTotal
 
         if recipe.pours.count != target { recipe.reflowPourCount(to: target) }
+        recipe.canonicalizePourTimings()
 
         if firstLayout {
             if recipe.pours.allSatisfy({ $0.toGrams == nil }) { recipe.reflowPourWeights() }
@@ -103,7 +104,10 @@ struct RecipeEditor: View {
         }
         .tint(Theme.accent)
 
-        TimeInputField(label: "Bloom", seconds: $recipe.bloomTimeSec, systemImage: "timer")
+        TimeInputField(label: "Bloom", seconds: Binding(
+            get: { recipe.bloomTimeSec },
+            set: { recipe.setBloomTime($0) }
+        ), systemImage: "timer")
         TimeInputField(label: "Drawdown (TDD)", seconds: $recipe.totalDrawdownSec, systemImage: "hourglass")
     }
 
@@ -504,6 +508,18 @@ private struct PourBreakdown: View {
                 ForEach(recipe.pours.indices, id: \.self) { index in
                     PourRow(
                         pour: $recipe.pours[index],
+                        start: Binding(
+                            get: {
+                                if index == 0 { return 0 }
+                                if index == 1 { return recipe.bloomTimeSec }
+                                return recipe.pours[index].startSec
+                            },
+                            set: { value in
+                                if index == 1 { recipe.setBloomTime(value) }
+                                else if index > 1 { recipe.pours[index].startSec = value }
+                            }
+                        ),
+                        fixedStart: index == 0,
                         showTimes: showTimes,
                         isLastPour: index == recipe.pours.count - 1,
                         totalWater: Binding(
@@ -525,6 +541,8 @@ private struct PourBreakdown: View {
 /// so it's shown in the accent color to read as linked to the Ratio/Total water fields above.
 private struct PourRow: View {
     @Binding var pour: Pour
+    var start: Binding<Int?>
+    var fixedStart: Bool
     var showTimes: Bool
     var isLastPour: Bool
     var totalWater: Binding<Double?>
@@ -534,7 +552,14 @@ private struct PourRow: View {
             HStack(spacing: 6) {
                 Text("#\(pour.order)").font(.caption.weight(.bold)).foregroundStyle(Theme.accent).frame(width: 24)
                 if showTimes {
-                    PourTimeField(placeholder: "start", seconds: $pour.startSec)
+                    if fixedStart {
+                        Text("0:00")
+                            .font(.param(.subheadline))
+                            .frame(width: 54)
+                            .accessibilityLabel("Pour start time, 0:00")
+                    } else {
+                        PourTimeField(placeholder: pour.order == 2 ? "bloom" : "start", seconds: start)
+                    }
                     Text("–").font(.caption).foregroundStyle(.secondary)
                     PourTimeField(placeholder: "end", seconds: $pour.endSec)
                 }

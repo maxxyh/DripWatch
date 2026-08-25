@@ -209,6 +209,8 @@ struct PourTimeline: View {
 struct RecipeReadout: View {
     let recipe: Recipe
 
+    private var canonicalPours: [Pour] { recipe.canonicalPours }
+
     var body: some View {
         WrapLayout(spacing: 8, lineSpacing: 8) {
             if let g = recipe.grind { pill("dial.medium", g.display) }
@@ -234,7 +236,7 @@ struct RecipeReadout: View {
         .padding(.vertical, 2)
 
         if recipe.hasPourBreakdown {
-            let sorted = recipe.pours.sorted { $0.order < $1.order }
+            let sorted = canonicalPours.sorted { $0.order < $1.order }
             let steps = sorted
                 .compactMap { p in p.toGrams.map { "\(gramText($0))g" } }
                 .joined(separator: " → ")

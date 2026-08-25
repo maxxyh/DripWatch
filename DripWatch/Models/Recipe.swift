@@ -165,6 +165,42 @@ struct Recipe: Codable, Hashable {
             pours = Array(pours.prefix(target))
         }
         for i in pours.indices { pours[i].order = i + 1 }
+        canonicalizePourTimings()
+    }
+
+    /// Keeps the two special pour starts aligned with their real meaning: brewing begins with
+    /// pour one at zero, and the bloom ends when pour two begins. `bloomTimeSec` is the single
+    /// persisted source of truth for that second value.
+    mutating func canonicalizePourTimings() {
+        if bloomTimeSec == nil {
+            bloomTimeSec = pours.first(where: { $0.order == 2 })?.startSec
+        }
+        for index in pours.indices {
+            if pours[index].order == 1 { pours[index].startSec = 0 }
+            if pours[index].order == 2 { pours[index].startSec = bloomTimeSec }
+        }
+    }
+
+    mutating func setBloomTime(_ seconds: Int?) {
+        bloomTimeSec = seconds
+        if seconds == nil {
+            for index in pours.indices where pours[index].order == 2 {
+                pours[index].startSec = nil
+            }
+        }
+        canonicalizePourTimings()
+    }
+
+    var canonicalPours: [Pour] {
+        var recipe = self
+        recipe.canonicalizePourTimings()
+        return recipe.pours
+    }
+
+    var canonicalizedPourTimings: Recipe {
+        var recipe = self
+        recipe.canonicalizePourTimings()
+        return recipe
     }
 
     /// Overwrites every row's cumulative target with a fresh suggested ramp for the current pour

@@ -37,6 +37,10 @@ export function TimeInput({
       placeholder={placeholder}
       aria-label={ariaLabel}
       value={text}
+      onClick={(event) => {
+        const input = event.currentTarget;
+        input.setSelectionRange(input.value.length, input.value.length);
+      }}
       onChange={(event) => {
         const next = liveTimeEntry(event.target.value);
         setDraft({ source: next.seconds, text: next.text });

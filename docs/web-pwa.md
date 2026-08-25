@@ -106,7 +106,11 @@ quick comparison, matching iOS. Both editors offer 100 g, 200 g, and 250 g bag-s
 their stepped/stepless classification through the guarded mutation API. Numeric recipe controls
 use iOS-style decrement/increment buttons and mobile numeric keypads; signed controls retain
 negative entry. Observed drawdown and shot time use the native digit-entry convention, so `230`
-becomes `2:30` while the stopwatch remains available. While tasting, "Previous notes" mirrors
+becomes `2:30` while the stopwatch remains available. Time inputs place the caret at the end when
+clicked so right-shifting digit entry cannot accidentally retain trailing zeros. Across recipe
+editing, live brewing, history, and exports, pour one always starts at `0:00`; pour two's start is
+the bloom time and edits through either field update the same synced `bloomTimeSec` value. While
+tasting, "Previous notes" mirrors
 `BrewCaptureView.swift`'s `PreviousNotesView`: the last few brews' terms are grouped one card per
 brewed date (collapsed to the most recent, "Show N more" reveals the rest) and keep positive/negative
 coloring, rather than one undifferentiated flat list of chips.

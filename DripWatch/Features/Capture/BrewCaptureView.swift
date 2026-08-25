@@ -441,12 +441,12 @@ struct BrewCaptureView: View {
             }
             editableBloom
             if recipe.hasPourBreakdown {
-                ForEach($recipe.pours) { $pour in
-                    let isLast = pour.id == recipe.pours.last?.id
-                    pourRow(order: pour.order,
-                            grams: isLast ? liveTotalWaterBinding : $pour.toGrams,
-                            start: $pour.startSec,
-                            end: $pour.endSec)
+                ForEach(recipe.pours.indices, id: \.self) { index in
+                    let isLast = index == recipe.pours.count - 1
+                    pourRow(order: recipe.pours[index].order,
+                            grams: isLast ? liveTotalWaterBinding : $recipe.pours[index].toGrams,
+                            start: livePourStartBinding(index: index),
+                            end: $recipe.pours[index].endSec)
                 }
             } else {
                 ForEach(Array(derived.indices), id: \.self) { index in
@@ -480,6 +480,21 @@ struct BrewCaptureView: View {
         recipe.pours = targets.enumerated().map { index, grams in
             Pour(order: index + 1, toGrams: grams)
         }
+        recipe.canonicalizePourTimings()
+    }
+
+    private func livePourStartBinding(index: Int) -> Binding<Int?> {
+        Binding(
+            get: {
+                if index == 0 { return 0 }
+                if index == 1 { return recipe.bloomTimeSec }
+                return recipe.pours[index].startSec
+            },
+            set: { value in
+                if index == 1 { recipe.setBloomTime(value) }
+                else if index > 1 { recipe.pours[index].startSec = value }
+            }
+        )
     }
 
     private func derivedPourGrams(index: Int, targets: [Double]) -> Binding<Double?> {
@@ -497,10 +512,17 @@ struct BrewCaptureView: View {
                                  targets: [Double],
                                  keyPath: WritableKeyPath<Pour, Int?>) -> Binding<Int?> {
         Binding(
-            get: { recipe.pours.indices.contains(index) ? recipe.pours[index][keyPath: keyPath] : nil },
+            get: {
+                if keyPath == \.startSec {
+                    if index == 0 { return 0 }
+                    if index == 1 { return recipe.bloomTimeSec }
+                }
+                return recipe.pours.indices.contains(index) ? recipe.pours[index][keyPath: keyPath] : nil
+            },
             set: { value in
                 materializeLivePours(targets)
-                recipe.pours[index][keyPath: keyPath] = value
+                if keyPath == \.startSec, index == 1 { recipe.setBloomTime(value) }
+                else if !(keyPath == \.startSec && index == 0) { recipe.pours[index][keyPath: keyPath] = value }
             }
         )
     }
@@ -513,7 +535,15 @@ struct BrewCaptureView: View {
             HStack(spacing: 8) {
                 Text("#\(order)").font(.param(.subheadline, weight: .bold))
                     .foregroundStyle(Theme.accent).frame(width: 28, alignment: .leading)
-                LivePourTimeField(placeholder: "start", seconds: start)
+                if order == 1 {
+                    Text("0:00")
+                        .font(.param(.subheadline, weight: .semibold))
+                        .frame(width: 58)
+                        .frame(minHeight: 44)
+                        .accessibilityLabel("Pour start time, 0:00")
+                } else {
+                    LivePourTimeField(placeholder: order == 2 ? "bloom" : "start", seconds: start)
+                }
                 Text("–").foregroundStyle(.secondary)
                 LivePourTimeField(placeholder: "end", seconds: end)
                 Spacer(minLength: 4)
@@ -532,7 +562,10 @@ struct BrewCaptureView: View {
             Label("Bloom", systemImage: "timer")
                 .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
             Spacer()
-            LivePourTimeField(placeholder: "—", seconds: $recipe.bloomTimeSec)
+            LivePourTimeField(placeholder: "—", seconds: Binding(
+                get: { recipe.bloomTimeSec },
+                set: { recipe.setBloomTime($0) }
+            ))
         }
         .frame(minHeight: 44)
     }

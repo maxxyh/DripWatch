@@ -55,6 +55,51 @@ struct RecipeTests {
         #expect(r.hasPourBreakdown)
     }
 
+    @Test func canonicalPourTimingsUseBrewStartAndBloomAsSpecialStarts() {
+        var r = Recipe()
+        r.bloomTimeSec = 45
+        r.pours = [
+            Pour(order: 1, startSec: 12),
+            Pour(order: 2, startSec: 60),
+            Pour(order: 3, startSec: 90),
+        ]
+
+        r.canonicalizePourTimings()
+
+        #expect(r.pours.map(\.startSec) == [0, 45, 90])
+    }
+
+    @Test func changingBloomUpdatesSecondPourStartWithoutTouchingLaterPours() {
+        var r = Recipe()
+        r.pours = [Pour(order: 1), Pour(order: 2), Pour(order: 3, startSec: 90)]
+
+        r.setBloomTime(40)
+
+        #expect(r.bloomTimeSec == 40)
+        #expect(r.pours.map(\.startSec) == [0, 40, 90])
+    }
+
+    @Test func canonicalTimingsPromoteALegacySecondPourStartToBloom() {
+        var r = Recipe()
+        r.pours = [Pour(order: 1), Pour(order: 2, startSec: 45)]
+
+        r.canonicalizePourTimings()
+
+        #expect(r.bloomTimeSec == 45)
+        #expect(r.pours.map(\.startSec) == [0, 45])
+    }
+
+    @Test func clearingBloomAlsoClearsTheSecondPourStart() {
+        var r = Recipe()
+        r.bloomTimeSec = 45
+        r.pours = [Pour(order: 1, startSec: 0), Pour(order: 2, startSec: 45)]
+
+        r.setBloomTime(nil)
+
+        #expect(r.bloomTimeSec == nil)
+        #expect(r.pours.map(\.startSec) == [0, nil])
+    }
+
     @Test func suggestedTargetsSplitEvenlyWithoutDose() {
         var r = Recipe(); r.totalWaterGrams = 240
         // No dose → even cumulative split, landing exactly on the total.

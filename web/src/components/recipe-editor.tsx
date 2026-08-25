@@ -44,9 +44,11 @@ import { NumericStepper } from "./numeric-stepper";
 import { TimeInput } from "./time-input";
 import type { GrinderRow, Recipe } from "@/lib/domain";
 import {
+  canonicalizePourTimings,
   effectiveWater,
   reconcileWater,
   setTotalWater,
+  setBloomTime,
   suggestedTargets,
 } from "@/lib/domain";
 import { mutate } from "@/lib/client-mutations";
@@ -96,7 +98,7 @@ function FieldRow({
 function reflowPours(recipe: Recipe, count = recipe.pourCount ?? 0): Recipe {
   if (count <= 0) return recipe;
   const targets = suggestedTargets(recipe, count);
-  return {
+  return canonicalizePourTimings({
     ...recipe,
     pourCount: count,
     pours: Array.from({ length: count }, (_, index) => ({
@@ -105,7 +107,7 @@ function reflowPours(recipe: Recipe, count = recipe.pourCount ?? 0): Recipe {
       order: index + 1,
       toGrams: targets[index],
     })),
-  };
+  });
 }
 export function RecipeEditor({
   recipe,
@@ -438,7 +440,7 @@ export function RecipeEditor({
                   <TimeInput
                     id="bloom"
                     seconds={recipe.bloomTimeSec}
-                    onChange={(value) => set("bloomTimeSec", value)}
+                    onChange={(value) => onChange(setBloomTime(recipe, value))}
                   />
                 </FieldRow>
                 <FieldRow icon={Hourglass} label="Drawdown (TDD)" htmlFor="tdd">
@@ -528,18 +530,23 @@ export function RecipeEditor({
                           </span>
                           {showTimes && (
                             <>
-                              <TimeInput
-                                id={`start-${i}`}
-                                seconds={pour.startSec}
-                                placeholder="start"
-                                aria-label={`Pour ${i + 1} start time`}
-                                className="h-8 w-16 rounded-md border-0 bg-muted/60 text-center text-xs shadow-none focus-visible:ring-1"
-                                onChange={(value) => {
-                                  const pours = [...recipe.pours];
-                                  pours[i] = { ...pour, startSec: value };
-                                  onChange({ ...recipe, pours });
-                                }}
-                              />
+                              {i === 0 ? (
+                                <span className="w-16 text-center font-mono text-xs tabular-nums" aria-label="Pour 1 start time, 0:00">0:00</span>
+                              ) : (
+                                <TimeInput
+                                  id={`start-${i}`}
+                                  seconds={i === 1 ? recipe.bloomTimeSec : pour.startSec}
+                                  placeholder={i === 1 ? "bloom" : "start"}
+                                  aria-label={`Pour ${i + 1} start time`}
+                                  className="h-8 w-16 rounded-md border-0 bg-muted/60 text-center text-xs shadow-none focus-visible:ring-1"
+                                  onChange={(value) => {
+                                    if (i === 1) return onChange(setBloomTime(recipe, value));
+                                    const pours = [...recipe.pours];
+                                    pours[i] = { ...pour, startSec: value };
+                                    onChange(canonicalizePourTimings({ ...recipe, pours }));
+                                  }}
+                                />
+                              )}
                               <span className="text-xs text-muted-foreground">–</span>
                               <TimeInput
                                 id={`end-${i}`}

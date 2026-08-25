@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   asPlanSeed,
   brewDiff,
+  canonicalizePourTimings,
   effectiveWater,
   grindDisplay,
   hasTaste,
@@ -15,11 +16,71 @@ import {
   secondsFromDigits,
   singlePendingPlanPatch,
   setTotalWater,
+  setBloomTime,
   suggestedTargets,
   type Recipe,
 } from "./domain";
 import { grinderMutationSchema, recipeSchema, tasteSchema } from "./domain-schema";
 describe("Swift recipe parity", () => {
+  it("uses brew start and bloom as the first two canonical pour starts", () => {
+    const recipe: Recipe = {
+      pours: [
+        { id: crypto.randomUUID(), order: 1, startSec: 12 },
+        { id: crypto.randomUUID(), order: 2, startSec: 60 },
+        { id: crypto.randomUUID(), order: 3, startSec: 90 },
+      ],
+      bloomTimeSec: 45,
+    };
+
+    expect(canonicalizePourTimings(recipe).pours.map((pour) => pour.startSec)).toEqual([
+      0, 45, 90,
+    ]);
+  });
+
+  it("updates the second pour start when bloom changes", () => {
+    const recipe: Recipe = {
+      pours: [
+        { id: crypto.randomUUID(), order: 1 },
+        { id: crypto.randomUUID(), order: 2 },
+        { id: crypto.randomUUID(), order: 3, startSec: 90 },
+      ],
+    };
+
+    expect(setBloomTime(recipe, 40)).toMatchObject({
+      bloomTimeSec: 40,
+      pours: [{ startSec: 0 }, { startSec: 40 }, { startSec: 90 }],
+    });
+  });
+
+  it("promotes a legacy second pour start when bloom is missing", () => {
+    const recipe: Recipe = {
+      pours: [
+        { id: crypto.randomUUID(), order: 1 },
+        { id: crypto.randomUUID(), order: 2, startSec: 45 },
+      ],
+    };
+
+    expect(canonicalizePourTimings(recipe)).toMatchObject({
+      bloomTimeSec: 45,
+      pours: [{ startSec: 0 }, { startSec: 45 }],
+    });
+  });
+
+  it("clears the second pour start when bloom is explicitly cleared", () => {
+    const recipe: Recipe = {
+      bloomTimeSec: 45,
+      pours: [
+        { id: crypto.randomUUID(), order: 1, startSec: 0 },
+        { id: crypto.randomUUID(), order: 2, startSec: 45 },
+      ],
+    };
+
+    expect(setBloomTime(recipe, undefined)).toMatchObject({
+      bloomTimeSec: undefined,
+      pours: [{ startSec: 0 }, { startSec: undefined }],
+    });
+  });
+
   it("starts a pourover with native defaults", () =>
     expect(newPourover()).toMatchObject({
       waterTempC: 92,

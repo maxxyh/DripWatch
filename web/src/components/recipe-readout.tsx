@@ -22,12 +22,14 @@ import { TimeInput } from "@/components/time-input";
 import { cn } from "@/lib/utils";
 import type { Pour, Recipe } from "@/lib/domain";
 import {
+  canonicalizePourTimings,
   effectiveWater,
   gramText,
   grind,
   grindDisplay,
   ratioText,
   setTotalWater,
+  setBloomTime,
   suggestedTargets,
   timeText,
 } from "@/lib/domain";
@@ -287,12 +289,13 @@ function LiveNumberInput({
 /// target) — mirrors the native app's `POUR PLAN` section, not the boxed cards the PWA used to
 /// render each pour target in.
 export function PourPlanList({
-  recipe,
+  recipe: rawRecipe,
   onChange,
 }: {
   recipe: Recipe;
   onChange?: (recipe: Recipe) => void;
 }) {
+  const recipe = canonicalizePourTimings(rawRecipe);
   const savedTargets = recipe.pours.map((pour) => pour.toGrams);
   const targets =
     savedTargets.length && savedTargets.every((value) => value !== undefined)
@@ -326,7 +329,7 @@ export function PourPlanList({
             id="live-bloom-time"
             aria-label="Bloom time"
             seconds={recipe.bloomTimeSec}
-            onChange={(seconds) => onChange({ ...recipe, bloomTimeSec: seconds })}
+            onChange={(seconds) => onChange(setBloomTime(recipe, seconds))}
             className="h-11 w-16 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
             placeholder="—"
           />
@@ -354,7 +357,7 @@ export function PourPlanList({
               toGrams: patch.toGrams,
             };
           }
-          onChange(next);
+          onChange(canonicalizePourTimings(next));
         };
         return (
           <div
@@ -367,14 +370,22 @@ export function PourPlanList({
               </span>
               {onChange ? (
                 <div className="flex items-center gap-1">
-                  <TimeInput
-                    id={`live-pour-${index}-start`}
-                    aria-label={`Pour ${index + 1} start time`}
-                    seconds={pour?.startSec}
-                    onChange={(seconds) => updatePour({ startSec: seconds })}
-                    className="h-11 w-14 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
-                    placeholder="start"
-                  />
+                  {index === 0 ? (
+                    <span className="w-14 text-center font-mono text-base font-semibold tabular-nums" aria-label="Pour 1 start time, 0:00">0:00</span>
+                  ) : (
+                    <TimeInput
+                      id={`live-pour-${index}-start`}
+                      aria-label={`Pour ${index + 1} start time`}
+                      seconds={index === 1 ? recipe.bloomTimeSec : pour?.startSec}
+                      onChange={(seconds) =>
+                        index === 1
+                          ? onChange(setBloomTime(recipe, seconds))
+                          : updatePour({ startSec: seconds })
+                      }
+                      className="h-11 w-14 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
+                      placeholder={index === 1 ? "bloom" : "start"}
+                    />
+                  )}
                   <span className="text-muted-foreground">–</span>
                   <TimeInput
                     id={`live-pour-${index}-end`}
@@ -428,7 +439,8 @@ export function PourPlanList({
 /// A compact, complete readout of a recipe's absolute values: chips, the pour targets and their
 /// timeline, and any technique notes. Read-only — used for the pending plan and every history
 /// entry, never for editing.
-export function RecipeReadout({ recipe }: { recipe: Recipe }) {
+export function RecipeReadout({ recipe: rawRecipe }: { recipe: Recipe }) {
+  const recipe = canonicalizePourTimings(rawRecipe);
   const savedTargets = recipe.pours.map((pour) => pour.toGrams);
   const targets =
     savedTargets.length && savedTargets.every((value) => value !== undefined)

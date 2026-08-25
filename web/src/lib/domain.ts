@@ -85,6 +85,28 @@ export function reconcileWater(r: Recipe): Recipe {
     totalWaterGrams: undefined,
   };
 }
+export function canonicalizePourTimings(recipe: Recipe): Recipe {
+  const bloomTimeSec =
+    recipe.bloomTimeSec ??
+    recipe.pours.find((pour) => pour.order === 2)?.startSec;
+  const pours = recipe.pours.map((pour) =>
+    pour.order === 1
+      ? { ...pour, startSec: 0 }
+      : pour.order === 2
+        ? { ...pour, startSec: bloomTimeSec }
+        : pour,
+  );
+  return { ...recipe, bloomTimeSec, pours };
+}
+export function setBloomTime(recipe: Recipe, seconds?: number): Recipe {
+  const pours =
+    seconds === undefined
+      ? recipe.pours.map((pour) =>
+          pour.order === 2 ? { ...pour, startSec: undefined } : pour,
+        )
+      : recipe.pours;
+  return canonicalizePourTimings({ ...recipe, bloomTimeSec: seconds, pours });
+}
 const round5 = (n: number) => Math.max(0, Math.round(n / 5) * 5);
 export function suggestedTargets(r: Recipe, count: number): number[] {
   const total = effectiveWater(r);
@@ -263,6 +285,7 @@ function beanFactLines(bean: BeanRow): string[] {
   return lines;
 }
 function recipeLines(r: Recipe, method: "pourover" | "espresso"): string[] {
+  r = canonicalizePourTimings(r);
   const lines: string[] = [];
   const g = grind(r);
   if (g) lines.push(`- Grind: ${grindDisplay(g)}`);

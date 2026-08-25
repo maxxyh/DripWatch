@@ -70,7 +70,7 @@ enum BrewMarkdown {
             if let b = r.bloomTimeSec { lines.append("- Bloom: \(timeText(b))") }
             if let tdd = r.totalDrawdownSec { lines.append("- Drawdown (TDD): \(timeText(tdd))") }
 
-            let pours = r.pours.sorted { $0.order < $1.order }
+            let pours = r.canonicalPours.sorted { $0.order < $1.order }
                 .filter { $0.toGrams != nil || $0.startSec != nil || $0.style?.nilIfBlank != nil }
             if !pours.isEmpty {
                 lines.append("- Pour-by-pour:")
