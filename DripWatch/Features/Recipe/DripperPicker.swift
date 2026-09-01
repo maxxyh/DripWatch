@@ -8,7 +8,7 @@ struct DripperPicker: View {
     static let presets: [DripperPreset] = [
         .init(name: "Hario V60 (Ceramic)", assetName: "DripperHarioV60Ceramic"),
         .init(name: "V60 Neo", assetName: "DripperV60Neo"),
-        .init(name: "April Brewer (Plastic)", assetName: "DripperAprilPlastic"),
+        .init(name: "April Brewer", assetName: "DripperAprilPlastic"),
     ]
 
     var body: some View {
@@ -70,7 +70,7 @@ struct DripperPreset: Identifiable {
     var shortName: String {
         switch name {
         case "Hario V60 (Ceramic)": "V60"
-        case "April Brewer (Plastic)": "April"
+        case "April Brewer": "April"
         default: name
         }
     }

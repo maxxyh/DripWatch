@@ -63,7 +63,7 @@ const VALUE_WIDTH = "w-40";
 const DRIPPER_PRESETS = [
   { name: "Hario V60 (Ceramic)", shortName: "V60", image: "/drippers/hario-v60-ceramic.png" },
   { name: "V60 Neo", shortName: "Neo", image: "/drippers/v60-neo.png" },
-  { name: "April Brewer (Plastic)", shortName: "April", image: "/drippers/april-plastic.png" },
+  { name: "April Brewer", shortName: "April", image: "/drippers/april-plastic.png" },
 ] as const;
 
 const dripperKey = (value?: string) => value ? equipmentIdentityKey(value) : "";

@@ -10,8 +10,8 @@ struct BrewDiffTests {
     }
 
     @Test func reportsAddedAndClearedDripper() {
-        var selected = Recipe(); selected.dripperName = "April Brewer (Plastic)"
-        #expect(BrewDiff.changes(from: Recipe(), to: selected) == ["dripper → April Brewer (Plastic)"])
+        var selected = Recipe(); selected.dripperName = "April Brewer"
+        #expect(BrewDiff.changes(from: Recipe(), to: selected) == ["dripper → April Brewer"])
         #expect(BrewDiff.changes(from: selected, to: Recipe()) == ["dripper cleared"])
     }
 

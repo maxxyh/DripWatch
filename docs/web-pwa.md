@@ -106,8 +106,8 @@ quick comparison, matching iOS. Both editors offer 100 g, 200 g, and 250 g bag-s
 `RecipeEditor` also remembers newly typed grinders and their stepped/stepless classification
 through the guarded mutation API. Grinder identity ignores outer whitespace and case, so casing
 variants reuse the oldest saved display spelling rather than creating another chip.
-The pourover dripper picker matches iOS as well: three visual presets (Hario V60 Ceramic, V60 Neo, and
-April Plastic) sit above an open text field, and `dripperName` is stored inside the recipe so the
+The pourover dripper picker matches iOS as well: three flat line-drawing presets (Hario V60 Ceramic,
+V60 Neo, and April Brewer) sit above an open text field, and `dripperName` is stored inside the recipe so the
 choice follows both logged brews and planned-next-brew drafts. Recipe readouts, exports, and
 brew-diff annotations include it. Numeric recipe controls
 use iOS-style decrement/increment buttons and mobile numeric keypads; signed controls retain
