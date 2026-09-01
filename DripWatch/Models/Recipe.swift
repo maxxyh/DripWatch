@@ -28,6 +28,10 @@ struct Pour: Codable, Hashable, Identifiable {
 /// everything is optional so a recipe can be as terse as `92°, 4 pours, 1:15` or expand into
 /// a full per-pour breakdown only when wanted.
 struct Recipe: Codable, Hashable {
+    /// The pourover brewer used for this recipe (for example, "V60 Neo"). Stored on the recipe
+    /// so it follows both completed brews and planned-next-brew drafts through sync.
+    var dripperName: String?
+
     // Grind is stored as flat optional scalars, NOT an optional nested `GrindSetting?`: SwiftData
     // flattens embedded Codable structs into columns, and its decoder *crashes* on a nil nested
     // struct (i.e. any brew logged without a grind — `EXC_BREAKPOINT` in GrindSetting.init(from:)).
@@ -247,7 +251,7 @@ struct Recipe: Codable, Hashable {
 
     /// True when nothing at all has been entered.
     var isEmpty: Bool {
-        grind == nil && waterTempC == nil && doseGrams == nil && ratio == nil
+        dripperName == nil && grind == nil && waterTempC == nil && doseGrams == nil && ratio == nil
             && totalWaterGrams == nil && pourCount == nil && bloomTimeSec == nil
             && totalDrawdownSec == nil && yieldGrams == nil && shotTimeSec == nil
             && preInfusionSec == nil && surfWaitSec == nil && steamModeSec == nil
@@ -257,6 +261,7 @@ struct Recipe: Codable, Hashable {
     /// A short one-line summary for history rows, e.g. `92° · 1:15 · 4 pours` or `18g → 36g · 28s`.
     var summaryLine: String {
         var parts: [String] = []
+        if let dripperName { parts.append(dripperName) }
         if let g = grind { parts.append(g.settingText) }
         if let t = waterTempC { parts.append("\(t)°") }
         if let d = doseGrams, let y = yieldGrams { parts.append("\(gramText(d))→\(gramText(y))g") }

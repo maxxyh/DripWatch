@@ -27,6 +27,13 @@ struct RecipeTests {
         #expect(Recipe().isEmpty)
     }
 
+    @Test func dripperMakesRecipeNonEmptyAndAppearsInSummary() {
+        var r = Recipe()
+        r.dripperName = "V60 Neo"
+        #expect(!r.isEmpty)
+        #expect(r.summaryLine == "V60 Neo")
+    }
+
     @Test func planSeedDropsMeasuredTimesButKeepsDials() {
         var r = Recipe()
         r.doseGrams = 18; r.yieldGrams = 42; r.ratio = 2.3

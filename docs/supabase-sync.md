@@ -20,6 +20,10 @@ proxies notebook and private-photo access through signed-passcode session routes
 columns remain snake_case. Reads paginate in stable 500-row pages. The browser never receives a
 Supabase key or direct Storage URL.
 
+Pourover `Recipe` JSON includes the optional `dripperName`. It is embedded recipe data (including
+pending plans), not a new relational table, so adding or clearing it travels through the existing
+brew/bean row last-writer-wins behavior without a schema migration.
+
 ## Security boundary
 
 This is deliberately a **no-auth shared-notebook prototype**. The `anon` role can select,

@@ -37,6 +37,7 @@ struct BrewMarkdownTests {
         bean.roasterNotes = "Dates, vanilla"
 
         var r = Recipe()
+        r.dripperName = "V60 Neo"
         r.grind = GrindSetting(grinderName: "1Zpresso J", major: 3, clickOffset: -1)
         r.waterTempC = 92; r.doseGrams = 15; r.ratio = 16; r.pourCount = 4; r.bloomTimeSec = 30
         let brew = Brew(brewedAt: .now, method: .pourover, recipe: r)
@@ -49,6 +50,7 @@ struct BrewMarkdownTests {
         #expect(md.contains("# Voyager — Pourover"))
         #expect(md.contains("Voyager Craft"))
         #expect(md.contains("**Recipe**"))
+        #expect(md.contains("Dripper: V60 Neo"))
         #expect(md.contains("1Zpresso J · 3(\u{2212}1)"))
         #expect(md.contains("1:16"))
         #expect(md.contains("Bloom: 0:30"))

@@ -105,7 +105,11 @@ labeled bag size in grams; shelf cards and bean detail derive and show the SGD-p
 quick comparison, matching iOS. Both editors offer 100 g, 200 g, and 250 g bag-size shortcuts.
 `RecipeEditor` also remembers newly typed grinders and their stepped/stepless classification
 through the guarded mutation API. Grinder identity ignores outer whitespace and case, so casing
-variants reuse the oldest saved display spelling rather than creating another chip. Numeric recipe controls
+variants reuse the oldest saved display spelling rather than creating another chip.
+The pourover dripper picker matches iOS as well: three visual presets (Hario V60 Ceramic, V60 Neo, and
+April Plastic) sit above an open text field, and `dripperName` is stored inside the recipe so the
+choice follows both logged brews and planned-next-brew drafts. Recipe readouts, exports, and
+brew-diff annotations include it. Numeric recipe controls
 use iOS-style decrement/increment buttons and mobile numeric keypads; signed controls retain
 negative entry. Observed drawdown and shot time use the native digit-entry convention, so `230`
 becomes `2:30` while the stopwatch remains available. Time inputs place the caret at the end when
@@ -128,7 +132,10 @@ whose width and height are both at most 1400 pixels. On the read side, `/api/pho
 resizes via `sharp` when called with a `?w=` (and optional `?q=`) query param, clamped to
 16-1400px / 40-90 quality; `src/lib/image-loader.ts` is the `next/image` custom loader that
 appends those params, so every display context requests roughly the size it renders at instead of
-always the full upload. Both `w`/`q` and the resulting `sharp()` decode share the same 1400px
+always the full upload. The loader only rewrites `/api/photos/*` sources — static assets under
+`public/` (e.g. `public/drippers/*.png`) pass through unresized and uncompressed, so any new small
+UI image belongs pre-shrunk to its actual display size and run through `pngquant`/`oxipng` before
+it's committed; nothing in the request path will do that for you. Both `w`/`q` and the resulting `sharp()` decode share the same 1400px
 `limitInputPixels` cap as upload validation — necessary because the anonymous Supabase policies
 (see "Required future migration" below) let `anon` write `storage.objects` and the referencing
 `bean_photos`/`brews` rows directly, bypassing the upload endpoint's own size/dimension checks, so

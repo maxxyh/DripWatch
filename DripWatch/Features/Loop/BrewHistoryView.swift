@@ -213,6 +213,7 @@ struct RecipeReadout: View {
 
     var body: some View {
         WrapLayout(spacing: 8, lineSpacing: 8) {
+            if let dripper = recipe.dripperName { pill("mug", dripper) }
             if let g = recipe.grind { pill("dial.medium", g.display) }
             if let t = recipe.waterTempC { pill("thermometer.medium", "\(t)°C") }
             if let d = recipe.doseGrams { pill("scalemass", "\(gramText(d))g") }

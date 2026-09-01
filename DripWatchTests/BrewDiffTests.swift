@@ -3,6 +3,18 @@ import Testing
 
 struct BrewDiffTests {
 
+    @Test func reportsChangedDripper() {
+        var a = Recipe(); a.dripperName = "Hario V60 (Ceramic)"
+        var b = Recipe(); b.dripperName = "V60 Neo"
+        #expect(BrewDiff.changes(from: a, to: b) == ["dripper → V60 Neo"])
+    }
+
+    @Test func reportsAddedAndClearedDripper() {
+        var selected = Recipe(); selected.dripperName = "April Brewer (Plastic)"
+        #expect(BrewDiff.changes(from: Recipe(), to: selected) == ["dripper → April Brewer (Plastic)"])
+        #expect(BrewDiff.changes(from: selected, to: Recipe()) == ["dripper cleared"])
+    }
+
     private func grind(_ name: String, _ major: Double, _ offset: Int) -> GrindSetting {
         GrindSetting(grinderName: name, major: major, clickOffset: offset)
     }

@@ -2,6 +2,10 @@ import { z } from "zod";
 
 const optionalNumber = z.number().finite().optional();
 const optionalInt = z.number().int().optional();
+const optionalTrimmedString = z.preprocess(
+  (value) => typeof value === "string" ? value.trim() || undefined : value,
+  z.string().optional(),
+);
 export const grindSettingSchema = z.object({
   grinderName: z.string(),
   major: z.number(),
@@ -18,6 +22,7 @@ export const pourSchema = z.object({
 });
 export type Pour = z.infer<typeof pourSchema>;
 export const recipeSchema = z.object({
+  dripperName: optionalTrimmedString,
   grinderName: z.string().optional(),
   grindMajor: optionalNumber,
   grindClickOffset: optionalInt,

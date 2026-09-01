@@ -69,6 +69,9 @@ struct RecipeEditor: View {
     // MARK: Pourover
 
     @ViewBuilder private var pouroverFields: some View {
+        DripperPicker(selection: $recipe.dripperName)
+        Divider().overlay(Theme.crema.opacity(0.3))
+
         NumberField(label: "Temp", unit: "°C", value: $recipe.waterTempC, range: 60...100, systemImage: "thermometer.medium", step: 1, stepDefault: 92)
         DecimalField(label: "Dose", unit: "g", value: $recipe.doseGrams, systemImage: "scalemass", step: 0.5, stepDefault: 15, range: 0...100, presets: [15, 20])
             // A total water typed before a dose was set is stuck as an explicit override

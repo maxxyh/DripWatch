@@ -45,6 +45,10 @@ fresh visual gap worth keeping around.
   Stepped/Stepless tab pair), and a draggable ruler for stepless settings. `recipe-editor.tsx` and
   the new `grind-ruler.tsx`/`ui/switch.tsx` match this now; the old "Stepless grinders use the
   absolute dial…" explainer paragraph is gone (iOS never shows one).
+- **The pourover dripper picker is visual but remains open-ended.** iOS and the PWA show the same
+  three illustrated presets—Hario V60 Ceramic, V60 Neo, and April Plastic—above an "Other
+  dripper" text field. Selection is also expressed by border/checkmark and accessible state, never
+  by color alone. The value is `Recipe.dripperName`, so it appears in history and planned recipes.
 - **The Brewing tab is a legible live console, not a second planning form.** Its readout is a
   distinct big stat-grid, not the icon-chip pills used in
   history (`RecipeReadout.swift`'s `pill()`). `brewing-phase-readout.jpg`: large bold

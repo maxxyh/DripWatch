@@ -2,11 +2,21 @@ import Foundation
 import SwiftData
 
 extension String {
+    /// Stable identity for user-entered equipment names without altering display spelling.
+    var equipmentIdentityKey: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(with: Locale(identifier: "en_US_POSIX"))
+    }
+
     /// Stable identity for grinder registry matching. Display spelling stays untouched, while
     /// outer whitespace and case cannot create a second logical grinder.
     var grinderIdentityKey: String {
-        trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased(with: Locale(identifier: "en_US_POSIX"))
+        equipmentIdentityKey
+    }
+
+    /// Stable matching for dripper presets and custom entries without altering display spelling.
+    var dripperIdentityKey: String {
+        equipmentIdentityKey
     }
 
     /// Title-case for display consistency, preserving codes and acronyms so coffee terms survive:

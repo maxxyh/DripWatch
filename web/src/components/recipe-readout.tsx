@@ -9,6 +9,7 @@ import {
   Droplets,
   Flame,
   Hourglass,
+  Coffee,
   Scale,
   Sparkles,
   Thermometer,
@@ -56,6 +57,7 @@ type Chip = { icon: LucideIcon; text: string };
 /// icon so the unit doesn't have to be spelled out in words next to it.
 function chips(r: Recipe): Chip[] {
   const list: Chip[] = [];
+  if (r.dripperName) list.push({ icon: Coffee, text: r.dripperName });
   const g = grind(r);
   // Full grinder + dial, never dial alone — CLAUDE.md's grind invariant: deltas are annotations
   // only, the absolute setting always stays visible.

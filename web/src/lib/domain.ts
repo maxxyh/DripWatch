@@ -28,8 +28,9 @@ export function photoUrl(
     : null;
 }
 export const emptyRecipe = (): Recipe => ({ pours: [] });
-export const grinderIdentityKey = (name: string) =>
+export const equipmentIdentityKey = (name: string) =>
   name.trim().toLocaleLowerCase("en-US");
+export const grinderIdentityKey = equipmentIdentityKey;
 export function dedupeGrinders(grinders: GrinderRow[]): GrinderRow[] {
   const byIdentity = new Map<string, GrinderRow>();
   for (const grinder of grinders.filter((candidate) => candidate.deleted_at === null)) {
@@ -317,6 +318,7 @@ function recipeLines(r: Recipe, method: "pourover" | "espresso"): string[] {
       lines.push(`- Steam mode: ${r.steamModeSec}s`);
     if (r.waterTempC !== undefined) lines.push(`- Temp: ${r.waterTempC}°C`);
   } else {
+    if (r.dripperName) lines.push(`- Dripper: ${r.dripperName}`);
     if (r.waterTempC !== undefined) lines.push(`- Temp: ${r.waterTempC}°C`);
     if (r.doseGrams !== undefined) lines.push(`- Dose: ${gramText(r.doseGrams)} g`);
     if (r.ratio !== undefined) lines.push(`- Ratio: 1:${ratioText(r.ratio)}`);
@@ -372,6 +374,11 @@ function tasteLines(t: Taste): string[] {
 }
 export function brewDiff(a: Recipe, b: Recipe) {
   const o: string[] = [];
+  if (
+    (a.dripperName ? equipmentIdentityKey(a.dripperName) : undefined) !==
+    (b.dripperName ? equipmentIdentityKey(b.dripperName) : undefined)
+  )
+    o.push(b.dripperName ? `dripper → ${b.dripperName}` : "dripper cleared");
   const ga = grind(a),
     gb = grind(b);
   if (ga && gb) {

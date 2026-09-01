@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
   Check,
@@ -47,6 +48,7 @@ import {
   canonicalizePourTimings,
   dedupeGrinders,
   effectiveWater,
+  equipmentIdentityKey,
   grinderIdentityKey,
   reconcileWater,
   setTotalWater,
@@ -57,6 +59,69 @@ import { mutate } from "@/lib/client-mutations";
 import { cn } from "@/lib/utils";
 
 const VALUE_WIDTH = "w-40";
+
+const DRIPPER_PRESETS = [
+  { name: "Hario V60 (Ceramic)", shortName: "V60", image: "/drippers/hario-v60-ceramic.png" },
+  { name: "V60 Neo", shortName: "Neo", image: "/drippers/v60-neo.png" },
+  { name: "April Brewer (Plastic)", shortName: "April", image: "/drippers/april-plastic.png" },
+] as const;
+
+const dripperKey = (value?: string) => value ? equipmentIdentityKey(value) : "";
+
+function DripperPicker({
+  value,
+  onChange,
+}: {
+  value?: string;
+  onChange: (value?: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <FieldLabel htmlFor="dripper" className="text-sm font-normal text-muted-foreground">
+        Dripper
+      </FieldLabel>
+      <div className="grid grid-cols-3 gap-2">
+        {DRIPPER_PRESETS.map((preset) => {
+          const selected = dripperKey(value) === dripperKey(preset.name);
+          return (
+            <button
+              key={preset.name}
+              type="button"
+              onClick={() => onChange(selected ? undefined : preset.name)}
+              className={cn(
+                "relative flex min-h-20 flex-col items-center justify-end gap-1 rounded-xl border px-1.5 pb-2 pt-1 transition-colors",
+                selected
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-input bg-muted/20 text-muted-foreground hover:bg-muted",
+              )}
+              aria-pressed={selected}
+              aria-label={`${preset.name}${selected ? ", selected" : ""}`}
+            >
+              <Image
+                src={preset.image}
+                alt=""
+                width={64}
+                height={54}
+                className="h-12 w-16 object-contain"
+              />
+              <span className="text-xs font-semibold">{preset.shortName}</span>
+              {selected && <Check className="absolute right-1.5 top-1.5 size-3.5" aria-hidden />}
+            </button>
+          );
+        })}
+      </div>
+      <Input
+        id="dripper"
+        value={value ?? ""}
+        onChange={(event) => {
+          const name = event.target.value;
+          onChange(name.trim() ? name : undefined);
+        }}
+        placeholder="Other dripper"
+      />
+    </div>
+  );
+}
 
 /// One full-width row — icon + label on the left, a compact value/stepper on the right — mirroring
 /// the native app's continuous list of plain rows (RecipeEditor.swift's `NumberField`/`DecimalField`)
@@ -229,6 +294,15 @@ export function RecipeEditor({
         </CardHeader>
         <CardContent>
           <FieldGroup>
+            {method === "pourover" && (
+              <>
+                <DripperPicker
+                  value={recipe.dripperName}
+                  onChange={(dripperName) => onChange({ ...recipe, dripperName })}
+                />
+                <div className="border-t" />
+              </>
+            )}
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
                 <FieldLabel htmlFor="grinder" className="gap-2 text-sm font-normal text-muted-foreground">

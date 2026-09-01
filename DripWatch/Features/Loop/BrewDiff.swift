@@ -10,6 +10,10 @@ enum BrewDiff {
     static func changes(from prev: Recipe, to curr: Recipe) -> [String] {
         var out: [String] = []
 
+        if prev.dripperName?.dripperIdentityKey != curr.dripperName?.dripperIdentityKey {
+            out.append(curr.dripperName.map { "dripper → \($0)" } ?? "dripper cleared")
+        }
+
         if let g = grindChange(from: prev.grind, to: curr.grind) { out.append(g) }
 
         if let a = prev.waterTempC, let b = curr.waterTempC, a != b {

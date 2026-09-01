@@ -24,6 +24,8 @@ needed. Keep this file concise; put durable topic detail in `docs/<topic>.md` an
 - Pour timing has two canonical starts: pour one is always `0:00`; pour two starts when bloom ends,
   with `bloomTimeSec` as their shared synced value.
 - Structured but progressive: everyday recipe line first, detail only when requested.
+- Pourover recipes carry an optional dripper name; iOS and the PWA share the Hario V60 Ceramic,
+  V60 Neo, and April Plastic visual presets while keeping custom text entry available.
 - Meaning is never color-only. Preserve Dynamic Type, ≥44pt targets, semantic colors, and
   `Theme`-based adaptive surfaces.
 

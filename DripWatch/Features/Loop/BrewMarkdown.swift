@@ -62,6 +62,7 @@ enum BrewMarkdown {
             if let sm = r.steamModeSec { lines.append("- Steam mode: \(sm)s") }
             if let t = r.waterTempC { lines.append("- Temp: \(t)°C") }
         } else {
+            if let dripper = r.dripperName { lines.append("- Dripper: \(dripper)") }
             if let t = r.waterTempC { lines.append("- Temp: \(t)°C") }
             if let d = r.doseGrams { lines.append("- Dose: \(gramText(d)) g") }
             if let ratio = r.ratio { lines.append("- Ratio: 1:\(ratioText(ratio))") }

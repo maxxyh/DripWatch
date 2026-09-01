@@ -193,6 +193,25 @@ describe("instrument formatting and diffs", () => {
       )[0],
     ).toBe("grind 3 → 2");
   });
+
+  it("round-trips a pourover dripper and reports a changed dripper", () => {
+    const recipe = recipeSchema.parse({
+      dripperName: "V60 Neo",
+      pours: [],
+    });
+    expect(recipe.dripperName).toBe("V60 Neo");
+    expect(recipeSchema.parse({ dripperName: "   ", pours: [] }).dripperName).toBeUndefined();
+    expect(
+      brewDiff(
+        { dripperName: "Hario V60 (Ceramic)", pours: [] },
+        { dripperName: "V60 Neo", pours: [] },
+      ),
+    ).toContain("dripper → V60 Neo");
+    expect(brewDiff({ pours: [] }, { dripperName: "V60 Neo", pours: [] }))
+      .toContain("dripper → V60 Neo");
+    expect(brewDiff({ dripperName: "V60 Neo", pours: [] }, { pours: [] }))
+      .toContain("dripper cleared");
+  });
   it("normalizes and deduplicates taste terms", () =>
     expect(normalizeTerms([" honey ", "HONEY", "red plum", "RED TEA"])).toEqual(
       ["Honey", "Red Plum", "RED TEA"],
