@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   asPlanSeed,
   brewDiff,
+  brewHistoryMarkdown,
   canonicalizePourTimings,
   effectiveWater,
   grindDisplay,
@@ -11,6 +12,7 @@ import {
   newPourover,
   normalizeTerm,
   normalizeTerms,
+  pourFlowRateGramsPerSecond,
   pricePerGramSGD,
   pricePerGramTextSGD,
   reconcileWater,
@@ -20,6 +22,8 @@ import {
   setTotalWater,
   setBloomTime,
   suggestedTargets,
+  type BeanRow,
+  type BrewRow,
   type Recipe,
 } from "./domain";
 import { grinderMutationSchema, recipeSchema, tasteSchema } from "./domain-schema";
@@ -227,6 +231,98 @@ describe("instrument formatting and diffs", () => {
       "USDA",
       "THA1",
     ]);
+  });
+  it("computes a pour's flow rate from its water delta and time window", () => {
+    // 60g over a 0:00–0:30 bloom is 2g/s.
+    expect(pourFlowRateGramsPerSecond(0, 60, 0, 30)).toBe(2);
+    // A later pour's delta is against the *previous* cumulative target, not its own total.
+    expect(pourFlowRateGramsPerSecond(60, 160, 30, 50)).toBe(5);
+  });
+  it("leaves flow rate undefined without complete or sensible timing", () => {
+    expect(pourFlowRateGramsPerSecond(0, 60, undefined, 30)).toBeUndefined();
+    expect(pourFlowRateGramsPerSecond(0, undefined, 0, 30)).toBeUndefined();
+    expect(pourFlowRateGramsPerSecond(0, 60, 30, 30)).toBeUndefined(); // zero-length window
+    expect(pourFlowRateGramsPerSecond(60, 60, 0, 30)).toBeUndefined(); // no water delta
+    expect(pourFlowRateGramsPerSecond(60, 40, 0, 30)).toBeUndefined(); // negative delta
+    // A later pour whose *previous* row hasn't had its water target typed in yet must not be
+    // silently treated as zero — that would show an inflated, made-up rate.
+    expect(pourFlowRateGramsPerSecond(undefined, 160, 30, 50)).toBeUndefined();
+  });
+});
+describe("brewHistoryMarkdown", () => {
+  const bean: BeanRow = {
+    id: crypto.randomUUID(),
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+    deleted_at: null,
+    name: "Voyager",
+    roaster_name: "Voyager Craft",
+    country: null,
+    region: null,
+    farm: null,
+    varietal: null,
+    process: null,
+    roast_level: null,
+    roast_date: null,
+    roaster_notes: null,
+    price_sgd: null,
+    bag_size_grams: null,
+    my_flavor_tags: [],
+    finished_at: null,
+    pending_next_pourover: null,
+    pending_next_espresso: null,
+  };
+  const baseRecipe: Recipe = {
+    pours: [],
+    grinderName: "1Zpresso J",
+    grindMajor: 3,
+    grindClickOffset: -1,
+    waterTempC: 92,
+    doseGrams: 15,
+    ratio: 16,
+  };
+  function makeBrew(overrides: Partial<BrewRow>): BrewRow {
+    return {
+      id: crypto.randomUUID(),
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      deleted_at: null,
+      brewed_at: "2026-01-01T00:00:00.000Z",
+      method_raw: "pourover",
+      brewers: [],
+      recipe: baseRecipe,
+      taste: { positives: [], negatives: [], balance: {} },
+      next_recipe_draft: null,
+      photo_path: null,
+      bean_id: bean.id,
+      ...overrides,
+    };
+  }
+  it("writes the full recipe once then only what changed per later brew", () => {
+    const brew1 = makeBrew({
+      brewed_at: "2026-01-01T00:00:00.000Z",
+      taste: { positives: ["honey"], negatives: [], balance: {} },
+    });
+    const brew2 = makeBrew({
+      brewed_at: "2026-01-02T00:00:00.000Z",
+      recipe: { ...baseRecipe, grindClickOffset: 1 }, // 2 clicks finer
+      taste: { positives: [], negatives: ["sour"], balance: {} },
+    });
+
+    // Passed newest-first, like the app's own brew lists.
+    const md = brewHistoryMarkdown(bean, [brew2, brew1]);
+
+    expect(md).toContain("Brew history (2 brews)");
+    expect(md).toContain("## Brew 1");
+    expect(md).toContain("**Recipe**");
+    expect(md).toContain("1Zpresso J · 3(−1)");
+    expect(md).toContain("## Brew 2");
+    expect(md).toContain("**Changes:**");
+    expect(md).toContain("2 clicks finer");
+    expect(md).toContain("Good: honey");
+    expect(md).toContain("Off: sour");
+    // Unchanged fields (temp, dose, ratio) aren't repeated as a second full recipe block.
+    expect(md.split("**Recipe**").length - 1).toBe(1);
   });
 });
 describe("native input behavior", () => {

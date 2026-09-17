@@ -143,6 +143,30 @@ export function suggestedTargets(r: Recipe, count: number): number[] {
   values[count - 1] = total;
   return values;
 }
+/// The average flow rate for one pour's window, in grams per second: the water poured during it
+/// (this pour's cumulative target minus the previous one's) divided by how long the pour took
+/// (`end - start`). `undefined` whenever a value it depends on hasn't been entered yet, or the
+/// window/delta is non-positive. Mirrors the iOS app's `pourFlowRateGramsPerSecond`. The very
+/// first pour has a real, known previous total of zero (nothing poured yet) — callers pass that
+/// explicitly rather than `undefined`, so `undefined` here always means "not entered" and is
+/// never silently treated as zero.
+export function pourFlowRateGramsPerSecond(
+  previousGrams: number | undefined,
+  grams: number | undefined,
+  start: number | undefined,
+  end: number | undefined,
+): number | undefined {
+  if (
+    grams === undefined ||
+    previousGrams === undefined ||
+    start === undefined ||
+    end === undefined ||
+    end <= start
+  )
+    return undefined;
+  const delta = grams - previousGrams;
+  return delta > 0 ? delta / (end - start) : undefined;
+}
 export const ratioText = (n: number) => String(Math.round(n * 100) / 100);
 export const gramText = (n: number) =>
   Number.isInteger(n) ? String(n) : n.toFixed(1);
@@ -264,6 +288,67 @@ export function brewMarkdown(
     sections.push(
       `**Planned next brew**\n${recipeLines(plannedNext, brew.method_raw).join("\n")}`,
     );
+  return sections.join("\n\n");
+}
+/// A bean's entire brew history as one Markdown document, for pasting into an AI to analyze the
+/// whole arc of brews at once. Bean facts and the first recipe per method are written out once;
+/// every later brew of that method shows only what changed since the previous one (the same
+/// delta `brewDiff` already computes for the on-screen annotation) instead of repeating the full
+/// recipe. Taste notes and the next-brew plan are never "carried state", so they're always shown
+/// in full when present. Mirrors the iOS app's `BrewMarkdown.string(forHistory:)`.
+export function brewHistoryMarkdown(bean: BeanRow, brews: BrewRow[]): string {
+  if (!brews.length) return "";
+  const chronological = [...brews].sort(
+    (a, b) => new Date(a.brewed_at).getTime() - new Date(b.brewed_at).getTime(),
+  );
+  const methods = new Set(chronological.map((brew) => brew.method_raw));
+
+  const sections: string[] = [];
+  const name = bean.name.trim() || "Untitled bean";
+  sections.push(
+    `# ${name} — Brew history (${chronological.length} brew${chronological.length === 1 ? "" : "s"})`,
+  );
+  if (bean.roaster_name?.trim()) sections.push(bean.roaster_name.trim());
+  const facts = beanFactLines(bean);
+  if (facts.length) sections.push(`**Bean**\n${facts.join("\n")}`);
+
+  const previousRecipe = new Map<string, Recipe>();
+  chronological.forEach((brew, index) => {
+    let header = `## Brew ${index + 1} — ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(brew.brewed_at))}`;
+    if (methods.size > 1)
+      header += ` · ${brew.method_raw === "pourover" ? "Pourover" : "Espresso"}`;
+
+    const body: string[] = [];
+    const previous = previousRecipe.get(brew.method_raw);
+    const isBaseline = previous === undefined;
+    if (previous) {
+      const diffs = brewDiff(previous, brew.recipe);
+      body.push(
+        diffs.length ? `**Changes:** ${diffs.join("; ")}` : "**Recipe:** unchanged",
+      );
+    } else {
+      body.push(
+        `**Recipe**\n${recipeLines(brew.recipe, brew.method_raw).join("\n")}`,
+      );
+    }
+    previousRecipe.set(brew.method_raw, brew.recipe);
+
+    // Notes are brew-specific commentary, not carried state, so they're worth repeating —
+    // `recipeLines` above already covers them for a method's first/baseline brew.
+    if (!isBaseline && brew.recipe.notes?.trim())
+      body.push(`**Notes:** ${brew.recipe.notes.trim()}`);
+
+    const taste = tasteLines(brew.taste);
+    if (taste.length) body.push(`**Taste**\n${taste.join("\n")}`);
+
+    if (brew.next_recipe_draft)
+      body.push(
+        `**Planned next brew**\n${recipeLines(brew.next_recipe_draft, brew.method_raw).join("\n")}`,
+      );
+
+    sections.push([header, ...body].join("\n"));
+  });
+
   return sections.join("\n\n");
 }
 function beanFactLines(bean: BeanRow): string[] {

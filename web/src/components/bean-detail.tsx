@@ -49,6 +49,7 @@ import type { BeanRow, BrewRow, Notebook, Recipe } from "@/lib/domain";
 import {
   asPlanSeed,
   brewDiff,
+  brewHistoryMarkdown,
   brewMarkdown,
   emptyRecipe,
   hasTaste,
@@ -284,10 +285,25 @@ export default function BeanDetail({
           )}
         </section>
         <section>
-          <div className="mb-4 flex items-baseline justify-between">
+          <div className="mb-4 flex items-baseline justify-between gap-2">
             <h2 className="text-2xl font-semibold">History</h2>
-            <span className="text-sm text-muted-foreground">
+            <span className="flex flex-1 items-baseline justify-end gap-1 text-sm text-muted-foreground">
               {brews.length} brew{brews.length === 1 ? "" : "s"} together
+              {brews.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Copy entire brew history"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(
+                      brewHistoryMarkdown(bean, brews),
+                    );
+                    toast.success("Brew history copied");
+                  }}
+                >
+                  <Copy />
+                </Button>
+              )}
             </span>
           </div>
           {brews.length ? (

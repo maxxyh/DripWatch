@@ -49,7 +49,9 @@ import {
   dedupeGrinders,
   effectiveWater,
   equipmentIdentityKey,
+  gramText,
   grinderIdentityKey,
+  pourFlowRateGramsPerSecond,
   reconcileWater,
   setTotalWater,
   setBloomTime,
@@ -586,6 +588,16 @@ export function RecipeEditor({
                     <span>to (g)</span>
                   </div>
                   {recipe.pours.map((pour, i) => {
+                    const rawFlowRate = pourFlowRateGramsPerSecond(
+                      i === 0 ? 0 : recipe.pours[i - 1]?.toGrams,
+                      pour.toGrams,
+                      i === 0 ? 0 : i === 1 ? recipe.bloomTimeSec : pour.startSec,
+                      pour.endSec,
+                    );
+                    const flowRate =
+                      rawFlowRate === undefined
+                        ? undefined
+                        : Math.round(rawFlowRate * 10) / 10;
                     const setGrams = (grams?: number) => {
                       const pours = [...recipe.pours],
                         nextPour = { ...pour, toGrams: grams };
@@ -663,6 +675,14 @@ export function RecipeEditor({
                           />
                           <span className="text-xs text-muted-foreground">g</span>
                         </div>
+                        {showTimes && flowRate !== undefined && (
+                          <div
+                            className="pl-8 text-right text-xs text-muted-foreground"
+                            aria-label={`Flow rate ${gramText(flowRate)} grams per second`}
+                          >
+                            {gramText(flowRate)} g/s
+                          </div>
+                        )}
                         <input
                           id={`style-${i}`}
                           type="text"
