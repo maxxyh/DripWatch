@@ -511,6 +511,7 @@ private struct PourBreakdown: View {
                 ForEach(recipe.pours.indices, id: \.self) { index in
                     PourRow(
                         pour: $recipe.pours[index],
+                        previousGrams: index == 0 ? 0 : recipe.pours[index - 1].toGrams,
                         start: Binding(
                             get: {
                                 if index == 0 { return 0 }
@@ -544,11 +545,14 @@ private struct PourBreakdown: View {
 /// so it's shown in the accent color to read as linked to the Ratio/Total water fields above.
 private struct PourRow: View {
     @Binding var pour: Pour
+    var previousGrams: Double?
     var start: Binding<Int?>
     var fixedStart: Bool
     var showTimes: Bool
     var isLastPour: Bool
     var totalWater: Binding<Double?>
+
+    private var grams: Double? { isLastPour ? totalWater.wrappedValue : pour.toGrams }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -581,6 +585,15 @@ private struct PourRow: View {
                         .frame(width: 46).font(.param(.subheadline))
                 }
                 Text("g").font(.caption).foregroundStyle(.secondary)
+            }
+            // Pour speed, once this pour's window (start–end) and its water delta are both known.
+            // Only meaningful alongside the time cells above, so it follows the same toggle.
+            if showTimes,
+               let rate = pourFlowRateGramsPerSecond(from: previousGrams, to: grams, start: start.wrappedValue, end: pour.endSec) {
+                Text("\(gramText((rate * 10).rounded() / 10)) g/s")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .accessibilityLabel("Flow rate \(gramText((rate * 10).rounded() / 10)) grams per second")
             }
             TextField("style / note (centre, aggressive…)",
                       text: Binding(get: { pour.style ?? "" }, set: { pour.style = $0.nilIfBlank }))
