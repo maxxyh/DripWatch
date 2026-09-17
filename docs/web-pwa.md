@@ -95,7 +95,10 @@ stale-write guards. Planning from the newest brew updates the bean's single acti
 the legacy per-brew `next_recipe_draft` field is no longer used by the PWA. Brewing mode retains
 the absolute recipe, cumulative
 pour targets and timing/style details, manual espresso technique, and roaster notes; history uses
-the same persisted pour rows rather than regenerating them.
+the same persisted pour rows rather than regenerating them. Each pour row also shows its average
+flow rate (g/s) once that pour's window and water delta are both known, mirroring iOS's
+`pourFlowRateGramsPerSecond` — shared by the live Brewing tab's pour plan and the Recipe tab's
+pour breakdown.
 
 Bean edits use the same term normalization as iOS: fact fields are title-cased while digit-bearing
 codes and short uppercase acronyms keep their spelling, comma lists are case-insensitively deduped,

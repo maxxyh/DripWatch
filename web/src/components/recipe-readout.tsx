@@ -28,6 +28,7 @@ import {
   gramText,
   grind,
   grindDisplay,
+  pourFlowRateGramsPerSecond,
   ratioText,
   setTotalWater,
   setBloomTime,
@@ -361,74 +362,93 @@ export function PourPlanList({
           }
           onChange(canonicalizePourTimings(next));
         };
+        const start = index === 0 ? 0 : index === 1 ? recipe.bloomTimeSec : pour?.startSec;
+        const rawFlowRate = pourFlowRateGramsPerSecond(
+          index === 0 ? 0 : targets[index - 1],
+          target,
+          start,
+          pour?.endSec,
+        );
+        const flowRate =
+          rawFlowRate === undefined ? undefined : Math.round(rawFlowRate * 10) / 10;
         return (
           <div
             key={pour?.id ?? index}
-            className="flex min-h-11 items-center justify-between gap-2 border-b border-border/40 py-1.5 last:border-b-0"
+            className="flex flex-col gap-0.5 border-b border-border/40 py-1.5 last:border-b-0"
           >
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span className="font-mono text-sm font-bold text-primary">
-                #{index + 1}
-              </span>
-              {onChange ? (
-                <div className="flex items-center gap-1">
-                  {index === 0 ? (
-                    <span className="w-14 text-center font-mono text-base font-semibold tabular-nums" aria-label="Pour 1 start time, 0:00">0:00</span>
-                  ) : (
-                    <TimeInput
-                      id={`live-pour-${index}-start`}
-                      aria-label={`Pour ${index + 1} start time`}
-                      seconds={index === 1 ? recipe.bloomTimeSec : pour?.startSec}
-                      onChange={(seconds) =>
-                        index === 1
-                          ? onChange(setBloomTime(recipe, seconds))
-                          : updatePour({ startSec: seconds })
-                      }
-                      className="h-11 w-14 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
-                      placeholder={index === 1 ? "bloom" : "start"}
-                    />
-                  )}
-                  <span className="text-muted-foreground">–</span>
-                  <TimeInput
-                    id={`live-pour-${index}-end`}
-                    aria-label={`Pour ${index + 1} end time`}
-                    seconds={pour?.endSec}
-                    onChange={(seconds) => updatePour({ endSec: seconds })}
-                    className="h-11 w-14 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
-                    placeholder="end"
-                  />
-                </div>
-              ) : pour?.startSec !== undefined ? (
-                <span className="text-xs text-muted-foreground">
-                  {timeText(pour.startSec)}
-                  {pour.endSec !== undefined ? `–${timeText(pour.endSec)}` : ""}
+            <div className="flex min-h-11 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="font-mono text-sm font-bold text-primary">
+                  #{index + 1}
                 </span>
-              ) : null}
-              {pour?.style && (
-                <span className="text-xs text-muted-foreground">{pour.style}</span>
+                {onChange ? (
+                  <div className="flex items-center gap-1">
+                    {index === 0 ? (
+                      <span className="w-14 text-center font-mono text-base font-semibold tabular-nums" aria-label="Pour 1 start time, 0:00">0:00</span>
+                    ) : (
+                      <TimeInput
+                        id={`live-pour-${index}-start`}
+                        aria-label={`Pour ${index + 1} start time`}
+                        seconds={index === 1 ? recipe.bloomTimeSec : pour?.startSec}
+                        onChange={(seconds) =>
+                          index === 1
+                            ? onChange(setBloomTime(recipe, seconds))
+                            : updatePour({ startSec: seconds })
+                        }
+                        className="h-11 w-14 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
+                        placeholder={index === 1 ? "bloom" : "start"}
+                      />
+                    )}
+                    <span className="text-muted-foreground">–</span>
+                    <TimeInput
+                      id={`live-pour-${index}-end`}
+                      aria-label={`Pour ${index + 1} end time`}
+                      seconds={pour?.endSec}
+                      onChange={(seconds) => updatePour({ endSec: seconds })}
+                      className="h-11 w-14 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-center font-mono text-base font-semibold shadow-none focus-visible:border-primary focus-visible:ring-0 md:text-base dark:bg-transparent"
+                      placeholder="end"
+                    />
+                  </div>
+                ) : pour?.startSec !== undefined ? (
+                  <span className="text-xs text-muted-foreground">
+                    {timeText(pour.startSec)}
+                    {pour.endSec !== undefined ? `–${timeText(pour.endSec)}` : ""}
+                  </span>
+                ) : null}
+                {pour?.style && (
+                  <span className="text-xs text-muted-foreground">{pour.style}</span>
+                )}
+              </div>
+              {onChange ? (
+                <label className="flex min-h-11 shrink-0 items-baseline border-b border-transparent focus-within:border-primary">
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    aria-label={`Pour ${index + 1} cumulative target`}
+                    value={target}
+                    onChange={(event) => {
+                      const raw = event.target.value.replace(",", ".");
+                      if (raw === "") return updatePour({ toGrams: undefined });
+                      if (!/^\d+(?:\.\d*)?$/.test(raw)) return;
+                      const parsed = Number(raw);
+                      if (Number.isFinite(parsed)) updatePour({ toGrams: parsed });
+                    }}
+                    className="h-10 w-14 rounded-none border-0 bg-transparent px-0 text-right font-mono text-base font-semibold tabular-nums shadow-none focus-visible:ring-0 md:text-base dark:bg-transparent"
+                  />
+                  <span className="text-sm text-muted-foreground">g</span>
+                </label>
+              ) : (
+                <span className="font-mono text-base font-semibold tabular-nums">
+                  {gramText(target)}g
+                </span>
               )}
             </div>
-            {onChange ? (
-              <label className="flex min-h-11 shrink-0 items-baseline border-b border-transparent focus-within:border-primary">
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  aria-label={`Pour ${index + 1} cumulative target`}
-                  value={target}
-                  onChange={(event) => {
-                    const raw = event.target.value.replace(",", ".");
-                    if (raw === "") return updatePour({ toGrams: undefined });
-                    if (!/^\d+(?:\.\d*)?$/.test(raw)) return;
-                    const parsed = Number(raw);
-                    if (Number.isFinite(parsed)) updatePour({ toGrams: parsed });
-                  }}
-                  className="h-10 w-14 rounded-none border-0 bg-transparent px-0 text-right font-mono text-base font-semibold tabular-nums shadow-none focus-visible:ring-0 md:text-base dark:bg-transparent"
-                />
-                <span className="text-sm text-muted-foreground">g</span>
-              </label>
-            ) : (
-              <span className="font-mono text-base font-semibold tabular-nums">
-                {gramText(target)}g
+            {flowRate !== undefined && (
+              <span
+                className="text-right text-xs text-muted-foreground"
+                aria-label={`Flow rate ${gramText(flowRate)} grams per second`}
+              >
+                {gramText(flowRate)} g/s
               </span>
             )}
           </div>
