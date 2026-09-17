@@ -144,6 +144,27 @@ therefore insufficient—inspect the built artifact or run the app and confirm n
 
 `Config/Secrets.xcconfig` remains ignored and can override local values. Do not stage it.
 
+### Targeting direct notebook writes
+
+Treat configuration files as environment-specific, not interchangeable. In particular,
+`web/.env.local` may point at the local Supabase preview (`127.0.0.1:54321`) while the iOS app uses
+the hosted project. A successful write and read-back against the preview does not verify that data
+reached the user's notebook.
+
+Before any manual SQL, REST, or SDK mutation of notebook data:
+
+1. Resolve the endpoint from the client whose notebook is being changed. For the installed iOS app,
+   use the effective `SupabaseConfig` destination (configured bundle value or shipped fallback), not
+   the web development environment.
+2. Print and compare the destination project ref with the documented hosted ref above before the
+   first write. Abort on a local host or unexpected ref.
+3. Check the intended hosted project for an active duplicate before inserting.
+4. Read the inserted row back by stable UUID from that same project. For a photo, also read the
+   `bean_photos` row, download the referenced private Storage object, and verify its content hash
+   matches the canonical `<photo-id>/<sha256>.jpg` path.
+
+This destination check is part of verification, not an optional diagnostic after a missing record.
+
 ## Backups and recovery
 
 Cloud sync is not a backup. `scripts/backup-supabase.sh` creates timestamped logical schema/data

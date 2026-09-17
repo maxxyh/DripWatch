@@ -97,6 +97,10 @@ work, also verify against the real Supabase project and run security/performance
 - New recipe parameters are optional. Put everyday values in the simple line and specialist
   values behind progressive disclosure.
 - Preserve unrelated user work in a dirty worktree. Do not stage local secrets.
+- Before a direct notebook data write, resolve the destination from the iOS configuration and
+  print/confirm the Supabase project ref. `web/.env.local` can target the local preview and is not
+  evidence that a write reached the hosted notebook. Verify the row and any Storage object by
+  reading them back from the intended project.
 - Before handoff: build, run proportional tests, verify external state when touched, review the
   diff independently for complex work, perform the mandatory documentation review, then commit.
 
