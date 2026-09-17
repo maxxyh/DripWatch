@@ -128,8 +128,8 @@ enum BrewMarkdown {
             if let b = r.bloomTimeSec { lines.append("- Bloom: \(timeText(b))") }
             if let tdd = r.totalDrawdownSec { lines.append("- Drawdown (TDD): \(timeText(tdd))") }
 
-            let pours = r.canonicalPours.sorted { $0.order < $1.order }
-                .filter { $0.toGrams != nil || $0.startSec != nil || $0.style?.nilIfBlank != nil }
+            let allPours = r.canonicalPours.sorted { $0.order < $1.order }
+            let pours = allPours.filter { $0.toGrams != nil || $0.startSec != nil || $0.style?.nilIfBlank != nil }
             if !pours.isEmpty {
                 lines.append("- Pour-by-pour:")
                 for p in pours {
@@ -137,6 +137,10 @@ enum BrewMarkdown {
                     if let s = p.startSec { parts.append(p.endSec.map { "\(timeText(s))–\(timeText($0))" } ?? timeText(s)) }
                     if let g = p.toGrams { parts.append("→ \(gramText(g)) g") }
                     if let style = p.style?.nilIfBlank { parts.append("(\(style))") }
+                    let previousGrams = p.order == 1 ? 0 : allPours.first(where: { $0.order == p.order - 1 })?.toGrams
+                    if let rate = pourFlowRateGramsPerSecond(from: previousGrams, to: p.toGrams, start: p.startSec, end: p.endSec) {
+                        parts.append("· \(gramText((rate * 10).rounded() / 10)) g/s")
+                    }
                     lines.append("  - #\(p.order): " + parts.joined(separator: " "))
                 }
             }

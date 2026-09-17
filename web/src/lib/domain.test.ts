@@ -3,6 +3,7 @@ import {
   asPlanSeed,
   brewDiff,
   brewHistoryMarkdown,
+  brewMarkdown,
   canonicalizePourTimings,
   effectiveWater,
   grindDisplay,
@@ -249,7 +250,7 @@ describe("instrument formatting and diffs", () => {
     expect(pourFlowRateGramsPerSecond(undefined, 160, 30, 50)).toBeUndefined();
   });
 });
-describe("brewHistoryMarkdown", () => {
+describe("brew markdown export", () => {
   const bean: BeanRow = {
     id: crypto.randomUUID(),
     created_at: "2026-01-01T00:00:00.000Z",
@@ -323,6 +324,31 @@ describe("brewHistoryMarkdown", () => {
     expect(md).toContain("Off: sour");
     // Unchanged fields (temp, dose, ratio) aren't repeated as a second full recipe block.
     expect(md.split("**Recipe**").length - 1).toBe(1);
+  });
+  it("shows each pour's flow rate in the pour-by-pour breakdown", () => {
+    const brew = makeBrew({
+      recipe: {
+        ...baseRecipe,
+        pourCount: 2,
+        bloomTimeSec: 30,
+        pours: [
+          { id: crypto.randomUUID(), order: 1, toGrams: 60, endSec: 30 },
+          {
+            id: crypto.randomUUID(),
+            order: 2,
+            toGrams: 240,
+            startSec: 30,
+            endSec: 60,
+          },
+        ],
+      },
+    });
+
+    const md = brewMarkdown(bean, brew);
+
+    expect(md).toContain("Pour-by-pour");
+    expect(md).toContain("#1: 0:00–0:30 → 60 g · 2 g/s");
+    expect(md).toContain("#2: 0:30–1:00 → 240 g · 6 g/s");
   });
 });
 describe("native input behavior", () => {

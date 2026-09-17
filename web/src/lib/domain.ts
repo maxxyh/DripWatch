@@ -414,14 +414,13 @@ function recipeLines(r: Recipe, method: "pourover" | "espresso"): string[] {
       lines.push(`- Bloom: ${timeText(r.bloomTimeSec)}`);
     if (r.totalDrawdownSec !== undefined)
       lines.push(`- Drawdown (TDD): ${timeText(r.totalDrawdownSec)}`);
-    const pours = [...r.pours]
-      .sort((a, b) => a.order - b.order)
-      .filter(
-        (p) =>
-          p.toGrams !== undefined ||
-          p.startSec !== undefined ||
-          p.style?.trim(),
-      );
+    const allPours = [...r.pours].sort((a, b) => a.order - b.order);
+    const pours = allPours.filter(
+      (p) =>
+        p.toGrams !== undefined ||
+        p.startSec !== undefined ||
+        p.style?.trim(),
+    );
     if (pours.length) {
       lines.push("- Pour-by-pour:");
       for (const p of pours) {
@@ -434,6 +433,16 @@ function recipeLines(r: Recipe, method: "pourover" | "espresso"): string[] {
           );
         if (p.toGrams !== undefined) parts.push(`→ ${gramText(p.toGrams)} g`);
         if (p.style?.trim()) parts.push(`(${p.style.trim()})`);
+        const previousGrams =
+          p.order === 1 ? 0 : allPours.find((x) => x.order === p.order - 1)?.toGrams;
+        const rawFlowRate = pourFlowRateGramsPerSecond(
+          previousGrams,
+          p.toGrams,
+          p.startSec,
+          p.endSec,
+        );
+        if (rawFlowRate !== undefined)
+          parts.push(`· ${gramText(Math.round(rawFlowRate * 10) / 10)} g/s`);
         lines.push(`  - #${p.order}: ${parts.join(" ")}`);
       }
     }

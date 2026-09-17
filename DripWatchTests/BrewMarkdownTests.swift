@@ -59,6 +59,21 @@ struct BrewMarkdownTests {
         #expect(md.contains("★★★☆☆"))
     }
 
+    @Test func markdownPourByPourIncludesFlowRate() {
+        var r = Recipe()
+        r.doseGrams = 15; r.pourCount = 2; r.bloomTimeSec = 30
+        r.pours = [
+            Pour(order: 1, toGrams: 60, endSec: 30),
+            Pour(order: 2, toGrams: 240, startSec: 30, endSec: 60),
+        ]
+        let brew = Brew(brewedAt: .now, method: .pourover, recipe: r)
+
+        let md = BrewMarkdown.string(for: brew)
+        #expect(md.contains("Pour-by-pour"))
+        #expect(md.contains("#1: 0:00–0:30 → 60 g · 2 g/s"))
+        #expect(md.contains("#2: 0:30–1:00 → 240 g · 6 g/s"))
+    }
+
     @Test func historyMarkdownWritesFullRecipeOnceThenOnlyChanges() {
         let bean = Bean(name: "Voyager")
         bean.roasterName = "Voyager Craft"
