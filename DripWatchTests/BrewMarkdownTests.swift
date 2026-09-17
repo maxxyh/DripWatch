@@ -58,4 +58,39 @@ struct BrewMarkdownTests {
         #expect(md.contains("Good: honey"))
         #expect(md.contains("★★★☆☆"))
     }
+
+    @Test func historyMarkdownWritesFullRecipeOnceThenOnlyChanges() {
+        let bean = Bean(name: "Voyager")
+        bean.roasterName = "Voyager Craft"
+
+        var r1 = Recipe()
+        r1.grind = GrindSetting(grinderName: "1Zpresso J", major: 3, clickOffset: -1)
+        r1.waterTempC = 92; r1.doseGrams = 15; r1.ratio = 16
+        let brew1 = Brew(brewedAt: .now.addingTimeInterval(-86400), method: .pourover, recipe: r1)
+        brew1.bean = bean
+        var t1 = Taste(); t1.positives = ["honey"]; brew1.taste = t1
+
+        var r2 = r1
+        r2.grind = GrindSetting(grinderName: "1Zpresso J", major: 3, clickOffset: 1)   // 2 clicks finer
+        let brew2 = Brew(brewedAt: .now, method: .pourover, recipe: r2)
+        brew2.bean = bean
+        var t2 = Taste(); t2.negatives = ["sour"]; brew2.taste = t2
+
+        let md = BrewMarkdown.string(forHistory: [brew2, brew1])   // newest-first input, like bean.timeline
+
+        #expect(md.contains("Brew history (2 brews)"))
+        // The first (chronologically oldest) brew carries the full absolute recipe.
+        #expect(md.contains("## Brew 1"))
+        #expect(md.contains("**Recipe**"))
+        #expect(md.contains("1Zpresso J · 3(\u{2212}1)"))
+        // The second brew shows only the delta, not a repeated full recipe block.
+        #expect(md.contains("## Brew 2"))
+        #expect(md.contains("**Changes:**"))
+        #expect(md.contains("2 clicks finer"))
+        #expect(md.contains("Good: honey"))
+        #expect(md.contains("Off: sour"))
+        // Unchanged fields (temp, dose, ratio) aren't repeated as a second full recipe block.
+        let secondRecipeBlocks = md.components(separatedBy: "**Recipe**").count - 1
+        #expect(secondRecipeBlocks == 1)
+    }
 }

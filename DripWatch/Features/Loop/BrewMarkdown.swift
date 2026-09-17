@@ -31,6 +31,63 @@ enum BrewMarkdown {
         return sections.joined(separator: "\n\n")
     }
 
+    /// Formats an entire brew history as Markdown for pasting into an AI for analysis across
+    /// brews. Bean facts and the first recipe per method are written out once; every later brew
+    /// of that method shows only what changed since the previous one (the same delta
+    /// `BrewDiff` already computes for the on-screen annotation) instead of repeating the full
+    /// recipe — so a long history stays proportional to how much actually changed, not to how
+    /// many brews were logged. Taste notes and the next-brew plan are never "carried state", so
+    /// they're always shown in full when present.
+    static func string(forHistory brews: [Brew]) -> String {
+        guard !brews.isEmpty else { return "" }
+        let bean = brews.first?.bean
+        let chronological = brews.sorted { $0.brewedAt < $1.brewedAt }
+        let methods = Set(chronological.map(\.method))
+
+        var sections: [String] = []
+
+        let name = bean?.name.nilIfBlank ?? "Untitled bean"
+        sections.append("# \(name) — Brew history (\(chronological.count) brew\(chronological.count == 1 ? "" : "s"))")
+
+        if let roaster = bean?.roasterName?.nilIfBlank { sections.append(roaster) }
+
+        let facts = beanFacts(bean)
+        if !facts.isEmpty { sections.append("**Bean**\n" + facts.joined(separator: "\n")) }
+
+        var previousRecipe: [BrewMethod: Recipe] = [:]
+        for (index, brew) in chronological.enumerated() {
+            var header = "## Brew \(index + 1) — \(brew.brewedAt.formatted(date: .abbreviated, time: .omitted))"
+            if methods.count > 1 { header += " · \(brew.method.label)" }
+
+            var body: [String] = []
+            let isBaseline = previousRecipe[brew.method] == nil
+            if let prev = previousRecipe[brew.method] {
+                let diffs = BrewDiff.changes(from: prev, to: brew.recipe)
+                body.append(diffs.isEmpty ? "**Recipe:** unchanged" : "**Changes:** " + diffs.joined(separator: "; "))
+            } else {
+                body.append("**Recipe**\n" + recipeLines(brew.recipe, method: brew.method).joined(separator: "\n"))
+            }
+            previousRecipe[brew.method] = brew.recipe
+
+            // Notes are brew-specific commentary, not carried state, so they're worth repeating —
+            // `recipeLines` above already covers them for a method's first/baseline brew.
+            if !isBaseline, let notes = brew.recipe.notes?.nilIfBlank {
+                body.append("**Notes:** \(notes)")
+            }
+
+            let taste = tasteLines(brew.taste)
+            if !taste.isEmpty { body.append("**Taste**\n" + taste.joined(separator: "\n")) }
+
+            if let next = brew.nextRecipeDraft {
+                body.append("**Planned next brew**\n" + recipeLines(next, method: brew.method).joined(separator: "\n"))
+            }
+
+            sections.append(([header] + body).joined(separator: "\n"))
+        }
+
+        return sections.joined(separator: "\n\n")
+    }
+
     private static func beanFacts(_ bean: Bean?) -> [String] {
         guard let bean else { return [] }
         var facts: [String] = []

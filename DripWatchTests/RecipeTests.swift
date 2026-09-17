@@ -340,4 +340,22 @@ struct RecipeTests {
         #expect(brewTwo.pours.last?.toGrams == 225)
         #expect(brewTwo.pours.map { $0.toGrams ?? 0 } == brewTwo.pours.map { $0.toGrams ?? 0 }.sorted())
     }
+
+    @Test func pourFlowRateDividesTheWaterDeltaByTheTimeWindow() {
+        // 60g over a 0:00–0:30 bloom is 2g/s.
+        #expect(pourFlowRateGramsPerSecond(from: 0, to: 60, start: 0, end: 30) == 2)
+        // A later pour's delta is against the *previous* cumulative target, not its own total.
+        #expect(pourFlowRateGramsPerSecond(from: 60, to: 160, start: 30, end: 50) == 5)
+    }
+
+    @Test func pourFlowRateIsNilWithoutCompleteOrSensibleTiming() {
+        #expect(pourFlowRateGramsPerSecond(from: 0, to: 60, start: nil, end: 30) == nil)
+        #expect(pourFlowRateGramsPerSecond(from: 0, to: nil, start: 0, end: 30) == nil)
+        #expect(pourFlowRateGramsPerSecond(from: 0, to: 60, start: 30, end: 30) == nil)   // zero-length window
+        #expect(pourFlowRateGramsPerSecond(from: 60, to: 60, start: 0, end: 30) == nil)   // no water delta
+        #expect(pourFlowRateGramsPerSecond(from: 60, to: 40, start: 0, end: 30) == nil)   // negative delta
+        // A later pour whose *previous* row hasn't had its water target typed in yet must not
+        // silently treat that unset value as zero — that would show an inflated, made-up rate.
+        #expect(pourFlowRateGramsPerSecond(from: nil, to: 160, start: 30, end: 50) == nil)
+    }
 }

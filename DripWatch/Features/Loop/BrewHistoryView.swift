@@ -41,6 +41,14 @@ func copyBrew(_ brew: Brew) {
     Haptics.success()
 }
 
+/// Copy a bean's entire brew history to the clipboard as one Markdown document, for pasting into
+/// an AI to analyze the whole arc of brews at once.
+func copyBrewHistory(_ brews: [Brew]) {
+    guard !brews.isEmpty else { return }
+    UIPasteboard.general.string = BrewMarkdown.string(forHistory: brews)
+    Haptics.success()
+}
+
 /// One brew in the log.
 struct BrewRow: View {
     let brew: Brew

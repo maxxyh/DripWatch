@@ -47,6 +47,12 @@ struct BeanDetailView: View {
                         Text("History").font(.title3.bold())
                         Spacer()
                         Text(bean.togetherLabel).font(.footnote).foregroundStyle(.secondary)
+                        Button {
+                            copyBrewHistory(bean.timeline)
+                        } label: {
+                            Image(systemName: "doc.on.doc").imageScale(.medium).foregroundStyle(.secondary).hitTarget(32)
+                        }
+                        .accessibilityLabel("Copy entire brew history")
                     }
                     .padding(.top, 4)
                     .id("history")

@@ -289,3 +289,17 @@ func ratioText(_ r: Double) -> String {
 func timeText(_ sec: Int) -> String {
     String(format: "%d:%02d", sec / 60, sec % 60)
 }
+
+/// The average flow rate for one pour's window, in grams per second: the water poured during it
+/// (this pour's cumulative target minus the previous one's) divided by how long the pour took
+/// (`end - start`). `nil` whenever a value it depends on hasn't been entered yet, or the
+/// window/delta is non-positive (a not-yet-finished timing edit, not a real rate). The very
+/// first pour has a real, known previous total of zero (nothing poured yet) — callers pass that
+/// explicitly rather than `nil`, so a `nil` here always means "not entered" and never gets
+/// silently treated as zero.
+func pourFlowRateGramsPerSecond(from previousGrams: Double?, to grams: Double?, start: Int?, end: Int?) -> Double? {
+    guard let grams, let previousGrams, let start, let end, end > start else { return nil }
+    let delta = grams - previousGrams
+    guard delta > 0 else { return nil }
+    return delta / Double(end - start)
+}

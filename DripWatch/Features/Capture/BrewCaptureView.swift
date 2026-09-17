@@ -445,6 +445,7 @@ struct BrewCaptureView: View {
                     let isLast = index == recipe.pours.count - 1
                     pourRow(order: recipe.pours[index].order,
                             grams: isLast ? liveTotalWaterBinding : $recipe.pours[index].toGrams,
+                            previousGrams: index == 0 ? 0 : recipe.pours[index - 1].toGrams,
                             start: livePourStartBinding(index: index),
                             end: $recipe.pours[index].endSec)
                 }
@@ -452,6 +453,7 @@ struct BrewCaptureView: View {
                 ForEach(Array(derived.indices), id: \.self) { index in
                     pourRow(order: index + 1,
                             grams: derivedPourGrams(index: index, targets: derived),
+                            previousGrams: index == 0 ? 0 : derived[index - 1],
                             start: derivedPourTime(index: index, targets: derived, keyPath: \.startSec),
                             end: derivedPourTime(index: index, targets: derived, keyPath: \.endSec))
                 }
@@ -529,6 +531,7 @@ struct BrewCaptureView: View {
 
     private func pourRow(order: Int,
                          grams: Binding<Double?>,
+                         previousGrams: Double?,
                          start: Binding<Int?>,
                          end: Binding<Int?>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -552,6 +555,13 @@ struct BrewCaptureView: View {
                     .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
                     .font(.param(.title3, weight: .semibold)).frame(width: 62).frame(minHeight: 44)
                 Text("g").font(.subheadline).foregroundStyle(.secondary)
+            }
+            // Pour speed, once this pour's window (start–end) and its water delta are both known.
+            if let rate = pourFlowRateGramsPerSecond(from: previousGrams, to: grams.wrappedValue, start: start.wrappedValue, end: end.wrappedValue) {
+                Text("\(gramText((rate * 10).rounded() / 10)) g/s")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .accessibilityLabel("Flow rate \(gramText((rate * 10).rounded() / 10)) grams per second")
             }
         }
         .padding(.vertical, 2)
