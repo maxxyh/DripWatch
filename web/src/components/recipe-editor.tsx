@@ -83,7 +83,7 @@ function DripperPicker({
       <FieldLabel htmlFor="dripper" className="text-sm font-normal text-muted-foreground">
         Dripper
       </FieldLabel>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {DRIPPER_PRESETS.map((preset) => {
           const selected = dripperKey(value) === dripperKey(preset.name);
           return (
