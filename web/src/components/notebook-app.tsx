@@ -258,7 +258,7 @@ function defaultSortDirection(field: SortField): "asc" | "desc" {
 
 const sortLabels: Record<SortField, string> = {
   updated: "Recently updated",
-  price: "Price",
+  price: "Price / g",
   name: "Name",
   roast: "Roast date",
 };
@@ -300,12 +300,22 @@ function compareBeans(
 ): number {
   let cmp = 0;
   switch (field) {
-    case "price":
-      if (a.price_sgd == null && b.price_sgd == null) cmp = 0;
-      else if (a.price_sgd == null) cmp = 1;
-      else if (b.price_sgd == null) cmp = -1;
-      else cmp = a.price_sgd - b.price_sgd;
+    case "price": {
+      const aPrice = pricePerGramSGD(a.price_sgd, a.bag_size_grams);
+      const bPrice = pricePerGramSGD(b.price_sgd, b.bag_size_grams);
+      if (aPrice === null || bPrice === null) {
+        if (aPrice === bPrice) return 0;
+        return dir === "asc"
+          ? aPrice === null
+            ? 1
+            : -1
+          : aPrice === null
+            ? -1
+            : 1;
+      }
+      cmp = aPrice - bPrice;
       break;
+    }
     case "name":
       cmp = (a.name || "").localeCompare(b.name || "");
       break;
