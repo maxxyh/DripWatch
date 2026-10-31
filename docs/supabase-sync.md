@@ -165,6 +165,11 @@ Before any manual SQL, REST, or SDK mutation of notebook data:
 
 This destination check is part of verification, not an optional diagnostic after a missing record.
 
+Claude Code cloud sessions can write rows through the Supabase MCP connector (`execute_sql`), but
+their egress proxy rejects direct HTTPS to `<ref>.supabase.co`, so they cannot upload Storage
+objects. Don't insert a `bean_photos` row without its object. Instead, write the rows and have
+the user attach the bag photo in the app, which uploads it through the normal photo-sync path.
+
 ## Backups and recovery
 
 Cloud sync is not a backup. `scripts/backup-supabase.sh` creates timestamped logical schema/data
