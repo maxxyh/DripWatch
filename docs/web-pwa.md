@@ -20,7 +20,13 @@ Required server-only variables are `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
 `DRIPWATCH_PASSCODE`, and `DRIPWATCH_SESSION_SECRET` (at least 32 random characters). Never use a
 service-role key or a `NEXT_PUBLIC_` prefix. Rotating the passcode invalidates existing sessions;
 rotating the session secret invalidates every session. Configure Vercel Firewall rate limiting on
-`/api/auth/login`; the application has no durable distributed rate limiter of its own.
+`/api/auth/login`; the application has no durable distributed rate limiter of its own. The signed
+session cookie uses `SameSite=Lax` so top-level navigations and PWA launches carry the session
+while state-changing `POST`/`PUT` routes continue to enforce same-origin checks; `/login` checks
+`hasSession()` on the server and redirects already-authenticated visitors to their validated `next`
+target (or `/`). Because `/login` redirects authenticated requests, `public/sw.js` precaches
+`/login` with `credentials: "omit"` so installing or updating the service worker while logged in
+never caches a redirected response.
 
 `DRIPWATCH_SESSION_SECRET` only signs/verifies sessions for the server instance that issued
 them — it never needs to match anyone else's, so each person can generate their own random
