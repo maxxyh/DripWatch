@@ -17,4 +17,9 @@ describe("protected photo cache contract", () => {
       "Offline caching is best-effort; never mask a valid network response.",
     );
   });
+
+  it("precaches /login without credentials so authenticated sessions don't cache a redirect", async () => {
+    const source = await readFile("public/sw.js", "utf8");
+    expect(source).toContain('new Request("/login", { credentials: "omit" })');
+  });
 });

@@ -18,6 +18,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { safeNextPath } from "@/lib/safe-next";
 
 export function LoginForm() {
   const params = useSearchParams();
@@ -39,10 +40,7 @@ export function LoginForm() {
       setError("That passcode does not match.");
       return;
     }
-    const next = params.get("next");
-    location.replace(
-      next?.startsWith("/") && !next.startsWith("//") ? next : "/",
-    );
+    location.replace(safeNextPath(params.get("next")));
   }
 
   return (

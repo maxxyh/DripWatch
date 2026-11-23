@@ -85,7 +85,7 @@ self.addEventListener("install", (event) =>
       .open(STATIC)
       .then((cache) =>
         cache.addAll([
-          "/login",
+          new Request("/login", { credentials: "omit" }),
           "/manifest.webmanifest",
           "/icons/icon-192.png",
           "/icons/icon-512.png",
